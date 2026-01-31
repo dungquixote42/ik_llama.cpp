@@ -6568,6 +6568,10 @@ void llama_set_causal_attn(struct llama_context * ctx, bool causal_attn) {
     ctx->cparams.causal_attn = causal_attn;
 }
 
+void llama_set_rope_freq_scale(struct llama_context * ctx, int32_t n_past) {
+    ctx->cparams.rope_freq_scale = 1.0f / (1 + n_past / ctx->cparams.n_ctx_orig_yarn);
+}
+
 struct llama_batch llama_batch_get_one(
              llama_token * tokens,
                  int32_t   n_tokens,

@@ -2546,6 +2546,8 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                         {"n_ctx",    n_ctx},
                         {"n_tokens", batch.n_tokens},
                         });
+
+                    n_pasts[slot.id] = slot.n_past;
                 }
             }
 
@@ -2756,8 +2758,6 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
                 send_final_response(slot);
                 metrics.on_prediction(slot);
             }
-
-            slot.i_batch = -1;
         }
 
         // speculative decoding - main model sample and accept
@@ -2805,6 +2805,8 @@ void server_context::update_slots() {
     // -1: none, 0: non-embedding, 1: embedding
     int32_t batch_type = batch.n_tokens > 0 ? 0 : -1;
 
+    n_pasts.resize(slots.size());
+
     // next, batch any pending prompts without exceeding n_batch
     batch_pending_prompt(n_ubatch, n_batch, batch_type);
 
@@ -2819,6 +2821,8 @@ void server_context::update_slots() {
 
     // make sure we're in the right embedding mode
     llama_set_embeddings(ctx, batch_type == 1);
+
+    llama_set_rope_freq_scale(ctx, n_pasts[0]);
 
     // process the created batch of tokens
     process_batch_tokens(n_batch);
