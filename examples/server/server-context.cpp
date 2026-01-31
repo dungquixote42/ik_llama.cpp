@@ -2756,6 +2756,8 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
                 send_final_response(slot);
                 metrics.on_prediction(slot);
             }
+
+            slot.i_batch = -1;
         }
 
         // speculative decoding - main model sample and accept
