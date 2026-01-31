@@ -226,8 +226,6 @@ struct server_context {
     int32_t cache_ram_n_min = 0;
     float cache_ram_similarity = 0.5f;
 
-    std::vector<int32_t> n_pasts;
-
     ~server_context();
 
     bool load_model(const gpt_params& params_);
