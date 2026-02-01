@@ -1053,8 +1053,7 @@ struct llama_sampler_dry* llama_sampler_init_dry_impl(const struct llama_vocab& 
 llama_token llama_sample_token_adaptive_p_impl(
               struct llama_sampling * smpl,
              llama_token_data_array * candidates,
-    struct llama_sampler_adaptive_p * adapt_p_ctx,
-                        const float   temp) {
+    struct llama_sampler_adaptive_p * adapt_p_ctx) {
     GGML_ASSERT(candidates->size > 0);
     const int64_t t_start_sample_us = ggml_time_us();
 
@@ -1079,7 +1078,7 @@ llama_token llama_sample_token_adaptive_p_impl(
 
     // update history
     float update_prob = 0;
-    if (temp > 1) {
+    if (ctx->update_w_cur_p) {
         update_prob = candidates->data[idx].p / ctx->cum_cur_p;
     } else {
         GGML_ASSERT(id < int(ctx->orig_prob.size()));
@@ -1155,6 +1154,10 @@ void llama_prep_adaptive_p_impl(
               struct llama_sampling * smpl,
              llama_token_data_array * candidates,
     struct llama_sampler_adaptive_p * adapt_p_ctx) {
+    if (adapt_p_ctx->update_w_cur_p) {
+        // update with current, original not needed
+        return;
+    }
     constexpr float kDelta = 30.0f; //16.6f;
     auto t_start = ggml_time_us();
     auto & orig_prob = adapt_p_ctx->orig_prob;
@@ -1180,7 +1183,7 @@ struct llama_sampler_adaptive_p * llama_init_adaptive_p_impl(int n_vocab,
        const float decay,
     const uint32_t seed) {
     GGML_ASSERT(n_vocab > 0);
-    const float clamped_decay = std::clamp(decay, 0.0f, 0.99f);
+    const float clamped_decay = std::clamp(std::abs(decay), 0.0f, 0.99f);
     auto result = new llama_sampler_adaptive_p {
         /* .target          = */ target,
         /* .decay           = */ clamped_decay,
@@ -1192,6 +1195,7 @@ struct llama_sampler_adaptive_p * llama_init_adaptive_p_impl(int n_vocab,
         /* .cum_cur_p       = */ 0.0f,
         /* .max_xform_logit = */ -INFINITY,
         /* .cum_probs       = */ {},
+        /* .update_w_cur_p  = */ decay < 0,
     };
     result->orig_prob.resize(n_vocab);
     return result;
