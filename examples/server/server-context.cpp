@@ -823,6 +823,7 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
     slot.sparams.mirostat_eta = json_value(data, "mirostat_eta", default_sparams.mirostat_eta);
     slot.sparams.adaptive_target = json_value(data, "adaptive_target", default_sparams.adaptive_target);
     slot.sparams.adaptive_decay = json_value(data, "adaptive_decay", default_sparams.adaptive_decay);
+    slot.sparams.adaptive_ratio = json_value(data, "adaptive_ratio", default_sparams.adaptive_ratio);
     slot.sparams.penalize_nl = json_value(data, "penalize_nl", default_sparams.penalize_nl);
     slot.params.n_keep = json_value(data, "n_keep", slot.params.n_keep);
     slot.params.n_discard = json_value(data, "n_discard", default_params.n_discard);

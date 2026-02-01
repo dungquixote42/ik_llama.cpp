@@ -1078,6 +1078,8 @@ llama_token llama_sample_token_adaptive_p_impl(
 
     GGML_ASSERT(id < int(ctx->orig_prob.size()));
     if (auto update_prob = ctx->orig_prob[id]; update_prob > 0) {
+        update_prob *= ctx->ratio;
+        update_prob += (1.0f - ctx->ratio) * candidates->data[idx].p / ctx->cum_recv_prob;
         ctx->weighted_sum = ctx->decay * ctx->weighted_sum + update_prob;
         ctx->total_weight = ctx->decay * ctx->total_weight + 1.0f;
     }
@@ -1111,6 +1113,7 @@ void llama_sample_adaptive_p_impl(struct llama_sampling * ctx, llama_token_data_
         candidates->data[i].p = prob;
         cum_sum += prob;
     }
+    adapt_p_ctx->cum_recv_prob = cum_sum;
 
     // compute adapted target probability
     const float target = std::clamp(adapt_p_ctx->target, 0.0f, 1.0f);
@@ -1169,17 +1172,20 @@ void llama_prep_adaptive_p_impl(
 struct llama_sampler_adaptive_p * llama_init_adaptive_p_impl(int n_vocab,
        const float target,
        const float decay,
+       const float weight,
     const uint32_t seed) {
     GGML_ASSERT(n_vocab > 0);
     const float clamped_decay = std::clamp(decay, 0.0f, 0.99f);
     auto result = new llama_sampler_adaptive_p {
         /* .target          = */ target,
         /* .decay           = */ clamped_decay,
+        /* .weight          = */ weight,
         /* .rng             = */ std::mt19937(seed),
         /* .weighted_sum    = */ target / (1.0f - clamped_decay),
         /* .total_weight    = */ 1.0f / (1.0f - clamped_decay),
         /* .orig_prob       = */ {},
         /* .cum_orig_prob   = */ 0.0f,
+        /* .cum_recv_prob   = */ 0.0f,
         /* .max_xform_logit = */ -INFINITY,
         /* .cum_probs       = */ {},
     };
