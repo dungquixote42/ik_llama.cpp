@@ -940,6 +940,11 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         sparams.adaptive_decay = std::stof(argv[i]);
         return true;
     }
+    if (arg == "--adaptive-use-cur-p") {
+        CHECK_ARG
+        sparams.adaptive_use_cur_p = true;
+        return true;
+    }
     if (arg == "--spec-replace") {
         CHECK_ARG
         std::string target = argv[i];
@@ -4227,7 +4232,7 @@ void yaml_dump_non_result_info(FILE * stream, const gpt_params & params, const l
     fprintf(stream, "typical_p: %f # default: 1.0\n", sparams.typical_p);
     fprintf(stream, "adaptive_target: %f # default: -1.0\n", sparams.adaptive_target);
     fprintf(stream, "adaptive_decay: %f # default: 0.9\n", sparams.adaptive_decay);
-    fprintf(stream, "adaptive_use_smpld_p: %s # default: false\n", sparams.adaptive_use_smpld_p ? "true" : "false");
+    fprintf(stream, "adaptive_use_cur_p: %s # default: false\n", sparams.adaptive_use_cur_p ? "true" : "false");
     fprintf(stream, "verbose_prompt: %s # default: false\n", params.verbose_prompt ? "true" : "false");
     fprintf(stream, "display_prompt: %s # default: true\n", params.display_prompt ? "true" : "false");
 }
