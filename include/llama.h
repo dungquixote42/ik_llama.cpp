@@ -414,6 +414,7 @@ extern "C" {
         // ref: https://github.com/ggerganov/llama.cpp/pull/2054
         float    rope_freq_base;   // RoPE base frequency, 0 = from model
         float    rope_freq_scale;  // RoPE frequency scaling factor, 0 = from model
+        int32_t  rope_scale_base;  // base RoPE scaling factor, <1 = disable dynamic scaling
         float    yarn_ext_factor;  // YaRN extrapolation mix factor, negative = from model
         float    yarn_attn_factor; // YaRN magnitude scaling factor
         float    yarn_beta_fast;   // YaRN low correction dim
@@ -998,6 +999,8 @@ extern "C" {
     // Set whether to use causal attention or not
     // If set to true, the model will only attend to the past tokens
     LLAMA_API void llama_set_causal_attn(struct llama_context * ctx, bool causal_attn);
+
+    LLAMA_API void llama_set_rope_scale_base(struct llama_context * ctx, int32_t rope_scale_base);
 
     LLAMA_API void llama_set_rope_freq_scale(struct llama_context * ctx, int32_t n_past);
 

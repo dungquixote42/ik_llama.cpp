@@ -559,6 +559,11 @@ static results_perplexity perplexity(llama_context * ctx, const gpt_params & par
         log_probs.resize(n_ctx * nv);
     }
 
+    llama_set_rope_scale_base(ctx, params.rope_scale_base);
+    if (llama_rope_type(llama_get_model(ctx)) != LLAMA_ROPE_TYPE_NONE) {
+        llama_set_rope_freq_scale(ctx, n_ctx);
+    }
+
     // We get the logits for all the tokens in the context window (params.n_ctx)
     // from llama_eval above.  Now, based on https://huggingface.co/docs/transformers/perplexity,
     // calculate the perplexity over the last half of the window (so the model always has

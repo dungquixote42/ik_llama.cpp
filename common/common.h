@@ -170,6 +170,7 @@ struct gpt_params {
     int32_t n_print               =    -1;  // print token count every n tokens (-1 = disabled)
     float   rope_freq_base        =  0.0f;  // RoPE base frequency
     float   rope_freq_scale       =  0.0f;  // RoPE frequency scaling factor
+    int32_t rope_scale_base       =     0;  // base RoPE scaling factor (<1 = disabled)
     float   yarn_ext_factor       = -1.0f;  // YaRN extrapolation mix factor
     float   yarn_attn_factor      =  -1.0f; // YaRN magnitude scaling factor
     float   yarn_beta_fast        = -1.0f;  // YaRN low correction dim

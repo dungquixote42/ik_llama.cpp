@@ -733,6 +733,11 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.rope_freq_scale = 1.0f / std::stof(argv[i]);
         return true;
     }
+    if (arg == "--rope-scale-base") {
+        CHECK_ARG
+        params.rope_scale_base = std::stof(argv[i]);
+        return true;
+    }
     if (arg == "--yarn-orig-ctx") {
         CHECK_ARG
         params.yarn_orig_ctx = std::stoi(argv[i]);
@@ -2284,6 +2289,7 @@ void gpt_params_print_usage(int /*argc*/, char ** argv, const gpt_params & param
     options.push_back({ "*",           "       --rope-scaling {none,linear,yarn}",
                                                                         "RoPE frequency scaling method, defaults to linear unless specified by the model" });
     options.push_back({ "*",           "       --rope-scale N",         "RoPE context scaling factor, expands context by a factor of N" });
+    options.push_back({ "*",           "       --rope-scale-base N",    "base RoPE context scaling factor, (default: %d, <1 = disable dynamic scaling)", params.rope_scale_base});
     options.push_back({ "*",           "       --rope-freq-base N",     "RoPE base frequency, used by NTK-aware scaling (default: loaded from model)" });
     options.push_back({ "*",           "       --rope-freq-scale N",    "RoPE frequency scaling factor, expands context by a factor of 1/N" });
     options.push_back({ "*",           "       --yarn-orig-ctx N",      "YaRN: original context size of model (default: %d = model training context size)", params.yarn_orig_ctx });

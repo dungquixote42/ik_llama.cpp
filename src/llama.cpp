@@ -4072,6 +4072,7 @@ struct llama_context_params llama_context_default_params() {
         /*.attention_type              =*/ LLAMA_ATTENTION_TYPE_UNSPECIFIED,
         /*.rope_freq_base              =*/ 0.0f,
         /*.rope_freq_scale             =*/ 0.0f,
+        /*.rope_scale_base             =*/ 0,
         /*.yarn_ext_factor             =*/ -1.0f,
         /*.yarn_attn_factor            =*/ -1.0f,
         /*.yarn_beta_fast              =*/ -1.0f,
@@ -4479,6 +4480,7 @@ struct llama_context * llama_new_context_with_model(
     cparams.n_ctx            = params.n_ctx           == 0    ? hparams.n_ctx_train           : params.n_ctx;
     cparams.rope_freq_base   = params.rope_freq_base  == 0.0f ? hparams.rope_freq_base_train  : params.rope_freq_base;
     cparams.rope_freq_scale  = params.rope_freq_scale == 0.0f ? hparams.rope_freq_scale_train : params.rope_freq_scale;
+    cparams.rope_scale_base  = params.rope_scale_base;
 
     // this is necessary due to kv_self.n being padded later during inference
     cparams.n_ctx            = GGML_PAD(cparams.n_ctx, llama_kv_cache_get_padding(cparams));
@@ -6574,8 +6576,18 @@ void llama_set_causal_attn(struct llama_context * ctx, bool causal_attn) {
     ctx->cparams.causal_attn = causal_attn;
 }
 
+void llama_set_rope_scale_base(struct llama_context * ctx, int32_t rope_scale_base) {
+    // printf("rope_scale_base = %d (%s)\n", rope_scale_base, rope_scale_base < 1 ? "disabled" : "enabled");
+    ctx->cparams.rope_scale_base = rope_scale_base;
+}
+
 void llama_set_rope_freq_scale(struct llama_context * ctx, int32_t n_past) {
-    ctx->cparams.rope_freq_scale = 1.0f / (1 + n_past / ctx->cparams.n_ctx_orig_yarn);
+    if ((ctx->cparams.n_ctx_orig_yarn == 0) || (ctx->cparams.rope_scale_base < 1)) {
+        return;
+    }
+    const int32_t rope_scale = n_past / ctx->cparams.n_ctx_orig_yarn + ctx->cparams.rope_scale_base;
+    ctx->cparams.rope_freq_scale = std::max(1.0f / (float)rope_scale, ctx->model.hparams.rope_freq_scale_train);
+    // printf(" n_past = %d, rope_scale = %d, rope_freq_scale_train = %f\n", n_past, rope_scale, ctx->model.hparams.rope_freq_scale_train);
 }
 
 struct llama_batch llama_batch_get_one(

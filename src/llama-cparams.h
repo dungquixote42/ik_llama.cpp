@@ -17,6 +17,7 @@ struct llama_cparams {
 
     float rope_freq_base;
     float rope_freq_scale;
+    int32_t rope_scale_base;
 
     uint32_t n_ctx_orig_yarn;
     // These hyperparameters are not exposed in GGUF, because all
