@@ -823,7 +823,8 @@ static const std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NA
             { LLM_TENSOR_FFN_GATE_SHEXP,     "blk.%d.ffn_gate_shexp" },
             { LLM_TENSOR_FFN_DOWN_SHEXP,     "blk.%d.ffn_down_shexp" },
             { LLM_TENSOR_FFN_UP_SHEXP,       "blk.%d.ffn_up_shexp" },
-	    { LLM_TENSOR_FFN_EXP_PROBS_B,    "blk.%d.exp_probs_b" },
+	        { LLM_TENSOR_FFN_EXP_PROBS_B,    "blk.%d.exp_probs_b" },
+            { LLM_TENSOR_FFN_POST_NORM,      "blk.%d.post_ffw_norm" },
         },
     },
     {
@@ -1564,6 +1565,7 @@ const char * llama_model_type_name(e_model type) {
         case MODEL_310B_A15B:     return "310B.A15B";
         case MODEL_300B_A47B:     return "300B.A47B";
         case MODEL_355B_A32B:     return "355B.A32B";
+        case MODEL_519B_A33B:     return "519B.A33B";
         case MODEL_E2B:           return "E2B";
         case MODEL_E4B:           return "E4B";
         default:                     return "?B";

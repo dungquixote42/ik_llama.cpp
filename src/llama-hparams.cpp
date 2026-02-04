@@ -801,13 +801,20 @@ void llm_load_hparams(
                     printf("================= Missing experts gating function -> set to %s\n",
                             llm_expert_gating_func_name(llm_expert_gating_func_type(hparams.expert_gating_func)));
                 }
-                ml.get_key(LLM_KV_ROPE_SCALING_YARN_LOG_MUL, hparams.rope_yarn_log_mul, false);
+                ml.get_key(LLM_KV_ROPE_SCALING_YARN_LOG_MUL, hparams.rope_yarn_log_mul, 0.0f);
 
                 switch (hparams.n_layer) {
                     case 27: model.type = e_model::MODEL_16B; break;
                     case 47: model.type = e_model::MODEL_30B_A3B; break; // GLM-4.7-Flash
                     case 60: model.type = e_model::MODEL_236B; break;
-                    case 61: model.type = e_model::MODEL_671B; break;
+                    case 61:
+                        ml.get_key(LLM_KV_EXPERT_COUNT, hparams.n_expert);
+                        switch (hparams.n_expert) {
+                            case 128: model.type = e_model::MODEL_671B; break;      // mistral-large
+                            case 192: model.type = e_model::MODEL_519B_A33B; break; // a.x-k1
+                            case 256: model.type = e_model::MODEL_671B; break;      // deepseek2
+                            default: model.type = e_model::MODEL_UNKNOWN;
+                        } break;
                     default: model.type = e_model::MODEL_UNKNOWN;
                 }
             } break;

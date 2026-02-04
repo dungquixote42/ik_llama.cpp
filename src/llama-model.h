@@ -115,6 +115,7 @@ enum e_model {
     MODEL_310B_A15B,
     MODEL_300B_A47B, // Ernie MoE big
     MODEL_355B_A32B,
+    MODEL_519B_A33B, // skt/a.x-k1
     MODEL_E2B,
     MODEL_E4B,
 };
