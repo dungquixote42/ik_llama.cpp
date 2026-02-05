@@ -2003,7 +2003,7 @@ void llama_vocab::impl::load(llama_model_loader & ml, const LLM_KV & kv) {
                 tokenizer_pre == "minimax-m2") {
                 pre_type = LLAMA_VOCAB_PRE_TYPE_MINIMAX_M2;
                 clean_spaces = false;
-            } else if (tokenizer_pre == "akx1") {
+            } else if (tokenizer_pre == "axk1") {
                 pre_type = LLAMA_VOCAB_PRE_TYPE_AXK1;
                 clean_spaces = false;
             }
