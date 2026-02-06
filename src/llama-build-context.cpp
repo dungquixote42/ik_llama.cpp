@@ -6363,6 +6363,7 @@ ggml_cgraph * llm_build_context::build_deepseek2() {
     int32_t n_tokens = this->n_tokens;
 
     bool is_lite = (hparams.n_layer == 27 || hparams.n_layer == 26);
+    bool is_axk1 = n_expert == 192;
 
     // We have to pre-scale kq_scale and attn_factor to make the YaRN RoPE work correctly.
     // See https://github.com/ggerganov/llama.cpp/discussions/7416 for detailed explanation.
@@ -6870,6 +6871,11 @@ ggml_cgraph * llm_build_context::build_deepseek2() {
 
                 cur = ggml_add(ctx0, moe_out, ffn_shexp);
                 cb(cur, "ffn_out", il);
+            }
+
+            if (is_axk1) {
+                cur = llm_build_norm(ctx0, cur, hparams, model.layers[il].ffn_post_norm, NULL, LLM_NORM_RMS, cb, il);
+                cb(cur, "ffn_post_norm", il);
             }
         }
 

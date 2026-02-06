@@ -1799,6 +1799,7 @@ bool create_tensors_helper::create_deepseek2_tensors(const LLM_TN & tn) {
     LOADING_PRELUDE
 
     const bool is_lite = (hparams.n_layer == 27 || hparams.n_layer == 26);
+    const bool is_axk1 = hparams.n_expert == 192;
 
     const int64_t n_embd_head_qk_rope = hparams.n_rot;
     const int64_t n_embd_head_qk_nope = hparams.n_embd_head_k - hparams.n_rot;
@@ -1901,8 +1902,7 @@ bool create_tensors_helper::create_deepseek2_tensors(const LLM_TN & tn) {
             layer.ffn_down_shexp = create_tensor(ctx_split, tn(LLM_TENSOR_FFN_DOWN_SHEXP, "weight", i), {        n_ff_exp * n_expert_shared, n_embd});
             layer.ffn_up_shexp   = create_tensor(ctx_split, tn(LLM_TENSOR_FFN_UP_SHEXP,   "weight", i), {n_embd, n_ff_exp * n_expert_shared});
 
-            layer.ffn_post_norm = create_tensor(ctx_layer,tn(LLM_TENSOR_LAYER_OUT_NORM, "weight", i), { n_embd }, llama_model_loader::TENSOR_NOT_REQUIRED);
-            if (!layer.ffn_post_norm) {
+            if (is_axk1) {
                 layer.ffn_post_norm = create_tensor(ctx_layer,tn(LLM_TENSOR_FFN_POST_NORM, "weight", i), { n_embd }, 0);
             }
         }
