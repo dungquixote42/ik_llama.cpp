@@ -13960,6 +13960,22 @@ static void ggml_compute_forward_repeat_f32(
 
     const struct ggml_tensor * src0 = dst->src[0];
 
+    if (ggml_is_contiguous(src0) && ggml_is_contiguous(dst) && src0->ne[0] == 1 && ggml_nrows(src0) == ggml_nrows(dst)) {
+        int ith = params->ith;
+        int nth = params->nth;
+        int nr = ggml_nrows(dst);
+        int nc = dst->ne[0];
+        int dr = (nr + nth - 1)/nth;
+        int ir0 = dr*ith;
+        int ir1 = MIN(nr, ir0 + dr);
+        const float * x = (const float *)src0->data;
+        for (int ir = ir0; ir < ir1; ++ir) {
+            float * y = (float *)((char *)dst->data + ir*dst->nb[1]);
+            for (int j = 0; j < nc; ++j) y[j] = x[ir];
+        }
+        return;
+    }
+
     if (params->ith != 0) {
         return;
     }
@@ -15140,6 +15156,7 @@ static void ggml_compute_forward_fused_mul_unary_f32(
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
     enum ggml_unary_op op = (enum ggml_unary_op)dst->op_params[0];
+    const float limit = *(const float *)(dst->op_params + 1);
 
     GGML_ASSERT(ggml_is_contiguous_1(src0));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
@@ -15167,7 +15184,19 @@ static void ggml_compute_forward_fused_mul_unary_f32(
         switch (op) {
             case GGML_UNARY_OP_GELU: ggml_vec_gelu_f32(nc, z, x); ggml_vec_mul_f32(nc, z, z, y); break;
             case GGML_UNARY_OP_RELU: ggml_vec_relu_f32(nc, z, x); ggml_vec_mul_f32(nc, z, z, y); break;
-            case GGML_UNARY_OP_SILU: ggml_vec_mul_silu_f32(nc, z, x, y); break;
+            case GGML_UNARY_OP_SILU: {
+                if (limit < 1e-6f) {
+                    ggml_vec_mul_silu_f32(nc, z, x, y);
+                } else {
+                    // TODO: simdify this
+                    for (int i = 0; i < nc; ++i) {
+                        float gate = ggml_silu_f32(x[i]);
+                        gate = MIN(gate, limit);
+                        float up = MAX(-limit, MIN(limit, y[i]));
+                        z[i] = up * gate;
+                    }
+                }
+            } break;
             default: GGML_ABORT("fatal error");
         }
     }
@@ -16673,6 +16702,7 @@ static void ggml_compute_forward_mul_mat_id_up_gate(
 
     ggml_barrier(params->shared);
 
+    const float limit = *(const float *)(dst->op_params + 1);
 
     // so GGML_TENSOR_BINARY_OP_LOCALS works
 
@@ -16704,7 +16734,7 @@ static void ggml_compute_forward_mul_mat_id_up_gate(
                             vec_dot_type, (const char *)wdata, row_size,
                             up_b_cur, gate_b_cur,
                             (float *)dst->data, nb1, nb2,
-                            matrix_rows + cur_a*ne12, ith, nth)) GGML_ABORT("fatal error");
+                            matrix_rows + cur_a*ne12, limit, ith, nth)) GGML_ABORT("fatal error");
 
     }
 
@@ -16769,6 +16799,8 @@ static void ggml_compute_forward_mul_mat_up_gate(
 
     ggml_barrier(params->shared);
 
+    float limit = *(const float *)(dst->op_params + 1);
+
     const size_t row_size = ggml_row_size(vec_dot_type, ne10);
 
     if (!iqk_moe_fused_up_gate(ne01, ne11, ne00, ne11, dst->op_params[0],
@@ -16776,7 +16808,7 @@ static void ggml_compute_forward_mul_mat_up_gate(
                          vec_dot_type, (const char *)wdata, row_size,
                          NULL, NULL,
                          (float *)dst->data, nb1, nb2,
-                         NULL, ith, nth)) GGML_ABORT("fatal error");
+                         NULL, limit, ith, nth)) GGML_ABORT("fatal error");
 
 }
 #endif
