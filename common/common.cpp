@@ -1544,6 +1544,26 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.banned_n = std::stoi(argv[i]);
         return true;
     }
+    if (arg == "--echo-canceler-anchor") {
+        CHECK_ARG
+        params.ec_anchor = argv[i];
+        return true;
+    }
+    // if (arg == "--echo-canceler-assistant-suffix") {
+    //     CHECK_ARG
+    //     params.echo_ass_sfx = argv[i];
+    //     return true;
+    // }
+    // if (arg == "--echo-canceler-user-suffix") {
+    //     CHECK_ARG
+    //     params.ec_usr_suffix = argv[i];
+    //     return true;
+    // }
+    // if (arg == "--echo-canceler-assistant-prefix") {
+    //     CHECK_ARG
+    //     params.ec_ass_prefix = argv[i];
+    //     return true;
+    // }
     if (arg == "-ld" || arg == "--logdir") {
         CHECK_ARG
         params.logdir = argv[i];

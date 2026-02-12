@@ -93,6 +93,13 @@ struct server_slot {
     float ban_phrases_bias = 0;
     int32_t banned_n = 1;
 
+    // for echo canceler
+    llama_token ec_anchor_tok = -1;
+    // int32_t ec_mra_pos = -1;    // most recent anchor position
+    // int32_t ec_lra_pos = -1;    // less recent anchor position
+    // std::vector<std::string> ec_mr_words;
+    // std::vector<std::string> ec_lr_words;
+
     server_prompt server_cached_prompt;
 
     void prompt_save(server_prompt_cache& prompt_cache) const;

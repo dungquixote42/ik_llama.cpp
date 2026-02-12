@@ -187,6 +187,9 @@ void server_context::init() {
             {"id_slot",    slot.id},
             {"n_ctx_slot", slot.n_ctx}
             });
+        if (!params_base.ec_anchor.empty()) {
+            slot.ec_anchor_tok = llama_tokenize(ctx, params_base.ec_anchor, false, true)[0];
+        }
 
         const int ga_n = params_base.grp_attn_n;
         const int ga_w = params_base.grp_attn_w;
@@ -2809,6 +2812,11 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
 
                     slot.cache_tokens.push_back(cur_tok);
 
+                    // if (cur_tok == slot.ec_anchor_tok) {
+                    //     // echo canceler updates anchor positions
+                    //     slot.ec_lra_pos = slot.ec_mra_pos;
+                    //     slot.ec_mra_pos = n_past_prompt;
+                    // }
 
                     slot.n_prompt_tokens_processed++;
                     slot_npast++;
@@ -2825,6 +2833,259 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
 
                 // entire prompt has been processed - start decoding new tokens
                 if (slot.n_past_prompt == slot.n_prompt_tokens) {
+                    // printf("%s %s\n", params_base.quote_ban_start.data(),  params_base.quote_ban_stop.data());
+
+                    // <ban quote>
+                    // static thread_local const llama_token qb_start_tok = common_tokenize(llama_get_model(ctx), params_base.quote_ban_start, false, true)[0];
+                    // std::vector<llama_token>::iterator start_it = find(prompt_tokens.end(), prompt_tokens.begin(), qb_start_tok);
+
+                    // static thread_local const llama_token qb_stop_tok = common_tokenize(llama_get_model(ctx), params_base.quote_ban_stop, false, true)[0];
+                    // std::vector<llama_token>::iterator stop_it = find(prompt_tokens.end() - 1, prompt_tokens.begin(), qb_stop_tok);
+
+                    // get most recent user (mru) indices
+                    // int mru_stop = -1;
+                    // if (!params_base.quote_ban_stop.empty()) {
+                    //     for (int i = prompt_tokens.size() - 1; i >= 0; i--) {
+                    //         static thread_local const llama_token qb_stop_tok = common_tokenize(llama_get_model(ctx), params_base.quote_ban_stop, false, true)[0];
+                    //         if (prompt_tokens[i] == qb_stop_tok) {
+                    //             mru_stop = i + 1;   // include (probably suffix) token for alphabet check
+                    //             break;
+                    //         }
+                    //     }
+                    // }
+                    // int mru_start = -1;
+                    // if (!params_base.quote_ban_start.empty()) {
+                    //     for (int i = mru_stop - 1; i >= 0; i--) {
+                    //         static thread_local const llama_token qb_start_tok = common_tokenize(llama_get_model(ctx), params_base.quote_ban_start, false, true)[0];
+                    //         if (prompt_tokens[i] == qb_start_tok) {
+                    //             mru_start = i + 1;  // exclude (probably prefix) token
+                    //             break;
+                    //         }
+                    //     }
+                    // }
+
+
+                    if (slot.ec_anchor_tok >= 0) {
+                        int mra_idx = -1;   // more recent anchor (mra) index
+                        for (int i = slot.n_prompt_tokens - 1; i >= 0; i--) {
+                            if (prompt_tokens[i] == slot.ec_anchor_tok) {
+                                mra_idx = i;
+                                break;
+                            }
+                        }
+                        int lra_idx = -1;   // less recent anchor (lra) index
+                        for (int i = mra_idx - 1; i >= 0; i--) {
+                            if (prompt_tokens[i] == slot.ec_anchor_tok) {
+                                lra_idx = i;
+                                break;
+                            }
+                        }
+
+                        if (lra_idx >= 0) {
+                            std::string ec_prompt = prompt_tokens.detokenize(ctx, false, lra_idx, mra_idx - lra_idx);
+                            int word_idx = -1;
+                            for (int i = 0; i < ec_prompt.size(); i++) {
+                                const char letter = ec_prompt[i];
+                                const bool is_alphabet = (letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z');
+                                if (word_idx < 0) {
+                                    if (is_alphabet) {
+                                        word_idx = i;
+                                    }
+                                } else {
+                                    if (!is_alphabet) {
+                                        std::string word = "\"";
+                                        word.append(ec_prompt.substr(word_idx, i - word_idx));
+                                        printf("%s ", word.data());
+                                        word.clear();
+                                        word_idx = -1;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (mra_idx >= 0) {
+                            std::string ec_prompt = prompt_tokens.detokenize(ctx, false, mra_idx, slot.n_prompt_tokens - 1 - mra_idx);
+                            int word_idx = -1;
+                            for (int i = 0; i < ec_prompt.size(); i++) {
+                                const char letter = ec_prompt[i];
+                                const bool is_alphabet = (letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z');
+                                if (word_idx < 0) {
+                                    if (is_alphabet) {
+                                        word_idx = i;
+                                    }
+                                } else {
+                                    if (!is_alphabet) {
+                                        std::string word = "\"";
+                                        word.append(ec_prompt.substr(word_idx, i - word_idx));
+                                        printf("%s ", word.data());
+                                        word.clear();
+                                        word_idx = -1;
+                                    }
+                                }
+                            }
+                        }
+
+
+
+                        // if ((mru_stop > mru_start) && (mru_start >= 0)) {
+                        //     std::string mru_prompt = prompt_tokens.detokenize(ctx, true, mru_start, mru_stop - mru_start).data();
+                        //     // std::string word = "";
+                        //     int word_start = -1;
+                        //     for (int i = 0; i < mru_prompt.size(); i++) {
+                        //         const char letter = mru_prompt[i];
+                        //         const bool is_alphabet = (letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z');
+                        //         if (is_alphabet) {
+                        //             if (word_start < 0) {
+                        //                 word_start = i;
+                        //             }
+                        //         } else {
+                        //             if (word_start >= 0) {
+                        //                 // found word
+                        //             }
+                        //         }
+
+                        //         if (word_start < 0) {
+                        //             if (is_alphabet) {
+                        //                 word_start = i;
+                        //             }
+                        //         } else {
+                        //             if (!is_alphabet) {
+                        //                 std::string word = "\"";
+                        //                 word.append(mru_prompt.substr(word_start, i - word_start));
+                        //                 printf("%s ", word.data());
+                        //                 word.clear();
+                        //                 word_start = -1;
+                        //             }
+                        //         }
+                        //     }
+                        // }
+                    }
+
+
+
+
+
+
+                    // if (slot.ec_anchor_tok >= 0) {
+                    //     // echo canceler is enabled
+                    //     static constexpr int ec_length = 1024;  // read this many tokens at a time
+                    //     static constexpr int ec_target = 2;
+                    //     int ec_start = slot.n_prompt_tokens - 1;
+                    //     int ec_count = 0;
+                    //     bool ec_done = false;
+                    //     while (!ec_done) {
+                    //         ec_start -= ec_length;
+                    //         if (ec_start < 0) {
+                    //             ec_start = 0;
+                    //             ec_done = true;
+                    //         }
+                    //         ec_count = std::count(prompt_tokens.begin() + ec_start, prompt_tokens.end(), slot.ec_anchor_tok);
+                    //         ec_done |= ec_count >= ec_target;
+                    //     }
+                    //     if (ec_count > 0) {
+                    //         std::vector<llama_token>::iterator ec_it = std::find(prompt_tokens.begin() + ec_start, prompt_tokens.end(), slot.ec_anchor_tok);
+                    //         for (int i = 0; i < ec_count - ec_target; i++) {
+                    //             ec_it = std::find(ec_it + 1, prompt_tokens.end(), slot.ec_anchor_tok);
+                    //         }
+                    //     }
+
+                    //     // if (ec_it != prompt_tokens.end()) {
+                            
+                    //     // }
+
+
+                    //     // bool done = false;
+                    //     // while (!done) {
+                    //     //     start -= length;
+                    //     //     if (start < 0) {
+                    //     //         // read entire prompt
+                    //     //         start = 0;
+                    //     //         done = true;
+                    //     //     }
+                    //     //     std::vector<llama_token>::iterator it = find();
+
+                    //     //     std::string ec_prompt = prompt_tokens.detokenize(ctx, true, start, length).data();
+                    //     // }
+
+
+                    //     // std::string ec_prompt = prompt_tokens.detokenize(ctx, true, slot.ec_lra_pos, mru_stop - mru_start).data();
+                    //     // for (int i = slot.ec_lra_pos; i < slot.ec_mra_pos; i++) {
+
+                    //     // }
+                    //     // for (int i = slot.ec_mra_pos; i < slot.n_prompt_tokens; i++) {
+
+                    //     // }
+                    // }
+
+
+                    // // printf("%d %d\n", mru_start, mru_stop);
+
+                    // // printf("%s %s\n", prompt_tokens.detokenize(ctx, true, mru_start, 1).data(), prompt_tokens.detokenize(ctx, true, mru_stop, 1).data());
+
+                    // if ((mru_stop > mru_start) && (mru_start >= 0)) {
+                    //     std::string mru_prompt = prompt_tokens.detokenize(ctx, true, mru_start, mru_stop - mru_start).data();
+                    //     // std::string word = "";
+                    //     int word_start = -1;
+                    //     for (int i = 0; i < mru_prompt.size(); i++) {
+                    //         const char letter = mru_prompt[i];
+                    //         const bool is_alphabet = (letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z');
+                    //         if (is_alphabet) {
+                    //             if (word_start < 0) {
+                    //                 word_start = i;
+                    //             }
+                    //         } else {
+                    //             if (word_start >= 0) {
+                    //                 // found word
+                    //             }
+                    //         }
+
+                    //         if (word_start < 0) {
+                    //             if (is_alphabet) {
+                    //                 word_start = i;
+                    //             }
+                    //         } else {
+                    //             if (!is_alphabet) {
+                    //                 std::string word = "\"";
+                    //                 word.append(mru_prompt.substr(word_start, i - word_start));
+                    //                 printf("%s ", word.data());
+                    //                 word.clear();
+                    //                 word_start = -1;
+                    //             }
+                    //         }
+
+                    //         // printf("%c", mru_prompt.data()[i]);
+                    //     }
+                    //     // printf("\n%s\n", mru_prompt.data());
+                    // }
+
+
+
+                    // printf("%d %d\n", qb_start_tok, qb_stop_tok);
+
+                    // printf("%d %d %d\n", slot.n_past, slot.n_past_prompt, slot.n_prompt_tokens);
+
+                    // size_t start = distance(prompt_tokens.begin(), start_it);
+                    // size_t length = distance(start_it, stop_it);
+                    // printf("%zu %zu\n", start, length);
+
+                    // for (int i = 0; i < prompt_tokens.size(); i++) {
+                    //     printf("%d ", prompt_tokens[i]);
+                    // }
+                    // printf("\n");
+
+                    // size_t stop_idx = distance(prompt_tokens.begin(), find(prompt_tokens.end(), prompt_tokens.begin(), qb_stop_tok));
+
+
+
+
+                    // std::cout << prompt;
+
+                    // for (std::vector<llama_token>::iterator it = start_it; it < stop_it; ++it) {
+                    //     const llama_token cur_tok = *it;
+                        
+                    // }
+
+
                     slot.state = SLOT_STATE_PROCESSING;
                     slot.command = SLOT_COMMAND_NONE;
                     GGML_ASSERT(batch.n_tokens > 0);
