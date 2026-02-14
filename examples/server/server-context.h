@@ -93,13 +93,6 @@ struct server_slot {
     float ban_phrases_bias = 0;
     int32_t banned_n = 1;
 
-    // for echo canceler
-    llama_token ec_anchor_tok = -1;
-    // int32_t ec_mra_pos = -1;    // most recent anchor position
-    // int32_t ec_lra_pos = -1;    // less recent anchor position
-    // std::vector<std::string> ec_mr_words;
-    // std::vector<std::string> ec_lr_words;
-
     server_prompt server_cached_prompt;
 
     void prompt_save(server_prompt_cache& prompt_cache) const;
@@ -243,6 +236,11 @@ struct server_context {
     float slot_prompt_similarity = 0.0f;
     int32_t cache_ram_n_min = 0;
     float cache_ram_similarity = 0.5f;
+
+    llama_token usr_head = -1;  // first token before user message
+    llama_token usr_tail = -1;  // first token after user message
+    llama_token ass_head = -1;  // first token before assistant message
+    llama_token ass_tail = -1;  // first token after assistant message
 
     ~server_context();
 

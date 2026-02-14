@@ -220,9 +220,10 @@ struct gpt_params {
     int32_t banned_n                 =  1; // number of tokens that are banned in the phrase
     size_t n_buffer 				 =  0; // number of token buffers for string ban
 
-    // std::string quote_ban_start      = "";
-    // std::string quote_ban_stop       = "";
-    std::string ec_anchor            = "";
+    std::string ass_pfx              = "";
+    std::string ass_sfx              = "";
+    std::string usr_pfx              = "";
+    std::string usr_sfx              = "";
 
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;
