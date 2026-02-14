@@ -3152,18 +3152,19 @@ void server_context::buffer_and_check_string_ban(server_slot & slot, completion_
     }
 }
 
-int32_t extract_message(std::string& msg, const server_tokens& prompt_tokens, const int32_t i_last,
-        llama_context * ctx, const llama_token head_tok, const llama_token tail_tok) {
-    int32_t idx = i_last;
+int32_t server_context::copy_message(std::string& msg, const server_tokens& tokens, const int32_t i_rbegin, const bool is_ass) {
+    int32_t idx = i_rbegin;
 
-    while ((idx >= 0) && prompt_tokens[idx] != tail_tok) { --idx; }
+    const llama_token tail_tok = is_ass ? ass_tail : usr_tail;
+    while ((idx >= 0) && tokens[idx] != tail_tok) { --idx; }
     const int32_t i_tail = idx;
     if (i_tail < 0) {
         LLAMA_LOG_INFO("%s: i_tail = %d\n", __func__, i_tail);
         return -1;
     }
 
-    while ((idx >= 0) && prompt_tokens[idx] != head_tok) { --idx; }
+    const llama_token head_tok = is_ass ? ass_head : usr_head;
+    while ((idx >= 0) && tokens[idx] != head_tok) { --idx; }
     const int32_t i_head = idx;
     if (i_head < 0) {
         LLAMA_LOG_INFO("%s: i_head = %d\n", __func__, i_head);
@@ -3171,16 +3172,18 @@ int32_t extract_message(std::string& msg, const server_tokens& prompt_tokens, co
     }
 
     const int32_t i_msg = i_head + 1;
-    msg = prompt_tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
+    msg = tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
     return i_head;
 }
 
-void copy_word(std::unordered_set<std::string>& words, std::string& msg, const int32_t i_word, const int32_t i_word_tail, const bool capitalize) {
-    std::string word = msg.substr(i_word, i_word_tail - i_word);
+std::string get_word(std::string& msg, const int32_t i_word, const int32_t i_word_tail, const bool capitalize,
+        const bool add_lquote, const bool add_rquote) {
+    std::string word = (add_lquote ? "\"" : "") + msg.substr(i_word, i_word_tail - i_word) + (add_rquote ? "\"" : "");
     if (capitalize) {
-        word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
+        const uint8_t i_first = add_lquote ? 1 : 0;
+        word[i_first] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[i_first])));
     }
-    words.insert(std::move(word));
+    return word;
 }
 
 int32_t server_context::echo_canceler(server_slot & slot) {
@@ -3188,22 +3191,18 @@ int32_t server_context::echo_canceler(server_slot & slot) {
 
     // most recent user message
     std::string msg;
-    int32_t i_head = extract_message(msg, slot.prompt_tokens, slot.prompt_tokens.size() - 1, ctx, usr_head, usr_tail);
+    int32_t i_head = copy_message(msg, slot.prompt_tokens, slot.prompt_tokens.size() - 1, false);
     if (i_head < 0) { return -1; }
 
-    printf("\nuser message: %s\n", msg.data());
+    // printf("\nuser message: %s\n", msg.data());
     std::unordered_set<std::string> words;
     int i_word = -1;
     for (int i = 0; i < msg.size(); i++) {
         const unsigned char letter = static_cast<unsigned char>(msg[i]);
-        if (letter == '\'' || std::isalpha(letter)) {
+        if (std::isalpha(letter)) {
             if (i_word < 0) i_word = i;
         }  else if (i_word >= 0) {
-            // std::string word = msg.substr(i_word, i - i_word);
-            // word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
-            // printf("%s ", word.data());
-            // echoes.insert(std::move(word));
-            copy_word(words, msg, i_word, i, true);
+            words.insert(std::move(get_word(msg, i_word, i, true, true, false)));
             i_word = -1;
         }
     }
@@ -3211,10 +3210,10 @@ int32_t server_context::echo_canceler(server_slot & slot) {
     if (ass_head < 0 || ass_tail < 0) { return 0; }
 
     // most recent assistant message
-    i_head = extract_message(msg, slot.prompt_tokens, i_head - 1, ctx, ass_head, ass_tail);
+    i_head = copy_message(msg, slot.prompt_tokens, i_head - 1, true);
     if (i_head < 0) { return -2; }
 
-    printf("\nassistant message: %s\n", msg.data());
+    // printf("\nassistant message: %s\n", msg.data());
     i_word = -1;
     bool in_quote = false;
     for (int i = 0; i < msg.size(); i++) {
@@ -3222,88 +3221,26 @@ int32_t server_context::echo_canceler(server_slot & slot) {
         if (letter == '\"') {
             in_quote = !in_quote;
             if (!in_quote && (i_word >= 0)) {
-                copy_word(words, msg, i_word, i, true);
+                // closing quote
+                words.insert(std::move(get_word(msg, i_word, i, true, true, false)));
                 i_word = -1;
             }
         } else if (in_quote) {
-            if (letter == '\'' || std::isalpha(letter)) {
+            if (std::isalpha(letter)) {
                 if (i_word < 0) i_word = i;
             } else if (i_word >= 0) {
-                copy_word(words, msg, i_word, i, true);
+                words.insert(std::move(get_word(msg, i_word, i, true, true, false)));
                 i_word = -1;
             }
         }
     }
 
-    for (const auto& word: words) { slot.ban_phrases.push_back('\"' + word); }
-    for (const auto& word: words) {
-        printf("%s ", ('\"' + word).data());
-    }
-    printf("\n\n");
-    return 0;
-
-    // while (!echo_cancelled && (usr_tail >= 0)) {
-
-    //     int idx = prompt_tokens.size() - 1;
-    //     while ((idx >= 0) && prompt_tokens[idx] != usr_tail) { --idx; }
-    //     int i_tail = idx;
-    //     while ((idx >= 0) && prompt_tokens[idx] != usr_head) { --idx; }
-    //     int i_head = idx;
-    //     if (idx < 0) { break; }
-
-    //     int i_msg = i_head + 1;
-    //     std::string msg = prompt_tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
-    //     printf("\nuser message: %s\n", msg.data());
-    //     int i_word = -1;
-    //     for (int i = 0; i < msg.size(); i++) {
-    //         const unsigned char letter = static_cast<unsigned char>(msg[i]);
-    //         if (letter == '\'' || std::isalpha(letter)) {
-    //             if (i_word < 0) i_word = i;
-    //         }  else if (i_word >= 0) {
-    //             std::string word = msg.substr(i_word, i - i_word);
-    //             word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
-    //             printf("%s ", word.data());
-    //             echoes.insert(std::move(word));
-    //             i_word = -1;
-    //         }
-    //     }
-
-    //     idx = i_head - 1;
-    //     while ((idx >= 0) && prompt_tokens[idx] != usr_tail) { --idx; }
-    //     i_tail = idx;
-    //     while ((idx >= 0) && prompt_tokens[idx] != usr_head) { --idx; }
-    //     i_head = idx;
-    //     if (idx < 0) { break; }
-
-    //     i_msg = i_head + 1;
-    //     std::string msg = prompt_tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
-    //     printf("\nassistant message: %s\n", msg.data());
-    //     i_word = -1;
-    //     bool in_quote = false;
-    //     for (int i = 0; i < msg.size(); i++) {
-    //         const unsigned char letter = static_cast<unsigned char>(msg[i]);
-    //         if (letter == '\"') {
-    //             if (in_quote) {
-    //                 std::string word = msg.substr(i_word, i - i_word);
-    //                 word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
-    //                 printf("%s ", word.data());
-    //                 echoes.insert(std::move(word));
-    //                 i_word = -1;
-    //             }
-    //             in_quote = !in_quote;
-    //         } else if (!in_quote) {
-    //             continue;
-    //         } else if (letter == '\'' || std::isalpha(letter)) {
-    //             if (i_word < 0) i_word = i;
-    //         } else if (i_word >= 0) {
-    //             std::string word = msg.substr(i_word, i - i_word);
-    //             word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
-    //             printf("%s ", word.data());
-    //             echoes.insert(std::move(word));
-    //             i_word = -1;
-    //         }
-    //     }
+    // for (const auto& word: words) {
+    //     printf("%s ", word.data());
     // }
+    // printf("\n\n");
+    for (const auto& word: words) { slot.ban_phrases.push_back(std::move(word)); }
+    return 0;
 }
 
 void server_context::process_batch_tokens(int32_t & n_batch) {
