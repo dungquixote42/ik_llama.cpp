@@ -349,6 +349,8 @@ struct server_context {
 
     void buffer_and_check_string_ban(server_slot& slot, completion_token_output& result);
 
+    int32_t echo_canceler(server_slot & slot);
+
     json model_meta() const;
 
     // Re-aggregates all active vectors and updates the model state
