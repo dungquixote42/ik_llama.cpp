@@ -951,6 +951,10 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         sparams.adaptive_updt_w_cur = true;
         return true;
     }
+    if (arg == "--echo-canceler") {
+        params.echo_canceler_on = true;
+        return true;
+    }
     if (arg == "--spec-replace") {
         CHECK_ARG
         std::string target = argv[i];
@@ -1684,6 +1688,11 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         sparams.penalize_nl = true;
         return true;
     }
+    if (arg == "--custom-alphas") {
+        CHECK_ARG
+        params.custom_alphas = argv[i];
+        return true;
+    }
     if (arg == "-l" || arg == "--logit-bias") {
         CHECK_ARG
         std::stringstream ss(argv[i]);
@@ -1943,6 +1952,12 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         }
         return true;
     }
+    if (arg == "--reasoning-format") {
+        CHECK_ARG
+        std::string value = argv[i];
+        params.reasoning_format = common_reasoning_format_from_name(value);
+        return true;
+    }
     if (arg == "--user-prefix") {
         CHECK_ARG
         params.usr_pfx = argv[i];
@@ -1961,31 +1976,6 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
     if (arg == "--assistant-suffix") {
         CHECK_ARG
         params.ass_sfx = argv[i];
-        return true;
-    }
-    if (arg == "--echo-canceler") {
-        params.echo_canceler_on = true;
-        return true;
-    }
-    if (arg == "--custom-alphas") {
-        CHECK_ARG
-        params.custom_alphas = argv[i];
-        return true;
-    }
-    // if (arg == "--introduction-penalty-n") {
-    //     CHECK_ARG
-    //     params.intro_pen_n = std::stoi(argv[i]);
-    //     return true;
-    // }
-    // if (arg == "--introduction-penalty-bias") {
-    //     CHECK_ARG
-    //     params.intro_pen_bias = std::stoi(argv[i]);
-    //     return true;
-    // }
-    if (arg == "--reasoning-format") {
-        CHECK_ARG
-        std::string value = argv[i];
-        params.reasoning_format = common_reasoning_format_from_name(value);
         return true;
     }
     if (arg == "--no-prefill-assistant") {
