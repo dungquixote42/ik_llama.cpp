@@ -44,6 +44,7 @@ struct common_grammar_trigger {
 
 // sampling parameters
 typedef struct common_params_sampling {
+    uint32_t    i_cur                 = 0;                  // current sampling index of current generation
     int32_t     n_prev                = 64;                 // number of previous tokens to remember
     int32_t     n_probs               = 0;                  // if greater than 0, output the probabilities of top n_probs tokens.
     int32_t     min_keep              = 0;                  // 0 = disabled, otherwise samplers should return at least min_keep tokens
@@ -55,7 +56,7 @@ typedef struct common_params_sampling {
     float       temp                  = 0.80f;              // <= 0.0 to sample greedily, 0.0 to not output probabilities
     float       dynatemp_range        = 0.00f;              // 0.0 = disabled
     float       dynatemp_exponent     = 1.00f;              // controls how entropy maps to temperature in dynamic temperature sampler
-    int32_t   penalty_last_n        = 64;                 // last n tokens to penalize (0 = disable penalty, -1 = context size)
+    int32_t     penalty_last_n        = 64;                 // last n tokens to penalize (0 = disable penalty, -1 = context size)
     float       penalty_repeat        = 1.00f;              // 1.0 = disabled
     float       penalty_freq          = 0.00f;              // 0.0 = disabled
     float       penalty_present       = 0.00f;              // 0.0 = disabled
@@ -73,6 +74,8 @@ typedef struct common_params_sampling {
     float       adaptive_target       = -1.0f;              // select tokens near this probability (valid range 0.0 to 1.0; <0 = disabled)
     float       adaptive_decay        = 0.90f;              // decay rate for target adaptation over time. lower values -> faster but less stable adaptation. (valid range 0.0 to 1.0; ≤0 = no adaptation)
     bool        adaptive_updt_w_cur   = false;              // update state with current probability
+    uint32_t    intro_pen_n           = 0;
+    int32_t     intro_pen_bias        = 0;
     bool        penalize_nl           = false;              // consider newlines as a repeatable token
     uint32_t    seed                  = LLAMA_DEFAULT_SEED; // the seed used to initialize llama_sampling_context
 
@@ -106,6 +109,9 @@ typedef struct common_params_sampling {
 
     std::vector<llama_token> penalty_prompt_tokens;
     bool                     use_penalty_prompt_tokens = false;
+
+    std::vector<llama_token> intro_pen_tokens = {};
+
 } llama_sampling_params;
 
 // general sampler context

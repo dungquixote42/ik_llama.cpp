@@ -2911,7 +2911,10 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                     if (rfind_messages) {
                         rfind_user_message(slot, slot.prompt_tokens.size() - 1);
                         rfind_assistant_message(slot, slot.i_usr_head);
+
                         if (params_base.echo_canceler_on) { echo_canceler(slot, params_base.custom_alphas); }
+
+                        
                     }
 
                     common_sampler_reset(slot.ctx_sampling);
