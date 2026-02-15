@@ -285,6 +285,8 @@ struct gpt_params {
     std::string usr_pfx              = "";
     std::string usr_sfx              = "";
 
+    bool echo_canceler_on            = false;
+
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;
     std::vector<std::pair<int,int>> offload_policy;

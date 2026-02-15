@@ -167,14 +167,14 @@ void server_context::init() {
     std::string delim = params_base.usr_sfx + params_base.ass_pfx;
     if (!delim.empty()) {
         auto tokens = common_tokenize(ctx, delim, false, true);
-        usr_tail = tokens[0];
-        ass_head = tokens.back();
+        usr_tail_tok = tokens[0];
+        ass_head_tok = tokens.back();
     }
     delim = params_base.ass_sfx + params_base.usr_pfx;
     if (!delim.empty()) {
         auto tokens = common_tokenize(ctx, delim, false, true);
-        ass_tail = tokens[0];
-        usr_head = tokens.back();
+        ass_tail_tok = tokens[0];
+        usr_head_tok = tokens.back();
     }
 
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
@@ -2902,6 +2902,10 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                     slot.command = SLOT_COMMAND_NONE;
                     GGML_ASSERT(batch.n_tokens > 0);
                     GGML_ASSERT((size_t)slot.n_prompt_tokens == slot.prompt_tokens.size());
+
+                    find_previous_user_indices(slot, slot.prompt_tokens.size() - 1);
+                    find_previous_assistant_indices(slot, slot.i_usr_head);
+
                     common_sampler_reset(slot.ctx_sampling);
                     for (int i = 0; i < slot.n_prompt_tokens; ++i) {
                         llama_token id = slot.prompt_tokens[i];
@@ -2923,7 +2927,7 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                         {"n_tokens", batch.n_tokens},
                         });
 
-                    echo_canceler(slot);
+                    if (params_base.echo_canceler_on) { echo_canceler(slot); }
                 }
             }
 
@@ -3152,30 +3156,6 @@ void server_context::buffer_and_check_string_ban(server_slot & slot, completion_
     }
 }
 
-int32_t server_context::copy_message(std::string& msg, const server_tokens& tokens, const int32_t i_rbegin, const bool is_ass) {
-    int32_t idx = i_rbegin;
-
-    const llama_token tail_tok = is_ass ? ass_tail : usr_tail;
-    while ((idx >= 0) && tokens[idx] != tail_tok) { --idx; }
-    const int32_t i_tail = idx;
-    if (i_tail < 0) {
-        LLAMA_LOG_INFO("%s: i_tail = %d\n", __func__, i_tail);
-        return -1;
-    }
-
-    const llama_token head_tok = is_ass ? ass_head : usr_head;
-    while ((idx >= 0) && tokens[idx] != head_tok) { --idx; }
-    const int32_t i_head = idx;
-    if (i_head < 0) {
-        LLAMA_LOG_INFO("%s: i_head = %d\n", __func__, i_head);
-        return -2;
-    }
-
-    const int32_t i_msg = i_head + 1;
-    msg = tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
-    return i_head;
-}
-
 std::string get_word(std::string& msg, const int32_t i_word, const int32_t i_word_tail, const bool capitalize,
         const bool add_lquote, const bool add_rquote) {
     std::string word = (add_lquote ? "\"" : "") + msg.substr(i_word, i_word_tail - i_word) + (add_rquote ? "\"" : "");
@@ -3186,15 +3166,64 @@ std::string get_word(std::string& msg, const int32_t i_word, const int32_t i_wor
     return word;
 }
 
+void server_context::find_previous_user_indices(server_slot & slot, const int32_t i_rbegin) {
+    if (usr_head_tok < 0 || usr_tail_tok < 0) { return; }
+    if (i_rbegin >= slot.prompt_tokens.size()) { return; }
+
+    int32_t idx = i_rbegin;
+    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_tail_tok) { --idx; }
+    slot.i_usr_tail = idx--;
+    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_head_tok) { --idx; }
+    slot.i_usr_head = idx;
+}
+
+void server_context::find_previous_assistant_indices(server_slot & slot, const int32_t i_rbegin) {
+    if (ass_head_tok < 0 || ass_tail_tok < 0) { return; }
+    if (i_rbegin >= slot.prompt_tokens.size()) { return; }
+
+    int32_t idx = i_rbegin;
+    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_tail_tok) { --idx; }
+    slot.i_ass_tail = idx--;
+    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_head_tok) { --idx; }
+    slot.i_ass_head = idx;
+}
+
+// int32_t server_context::copy_message(std::string& msg, const server_tokens& tokens, const int32_t i_rbegin, const bool is_ass) {
+//     int32_t idx = i_rbegin;
+
+//     const llama_token tail_tok = is_ass ? ass_tail_tok : usr_tail_tok;
+//     while ((idx >= 0) && tokens[idx] != tail_tok) { --idx; }
+//     const int32_t i_tail = idx;
+//     if (i_tail < 0) {
+//         LLAMA_LOG_INFO("%s: i_tail = %d\n", __func__, i_tail);
+//         return -1;
+//     }
+
+//     const llama_token head_tok = is_ass ? ass_head_tok : usr_head_tok;
+//     while ((idx >= 0) && tokens[idx] != head_tok) { --idx; }
+//     const int32_t i_head = idx;
+//     if (i_head < 0) {
+//         LLAMA_LOG_INFO("%s: i_head = %d\n", __func__, i_head);
+//         return -2;
+//     }
+
+//     const int32_t i_msg = i_head + 1;
+//     msg = tokens.detokenize(ctx, false, i_msg, i_tail - i_msg);
+//     return i_head;
+// }
+
 int32_t server_context::echo_canceler(server_slot & slot) {
-    if (usr_head < 0 || usr_tail < 0) { return 0; }
+    if (usr_head_tok < 0 || usr_tail_tok < 0) { return 0; }
+
+    int32_t i_msg = slot.i_usr_head + 1;
+    std::string msg = slot.prompt_tokens.detokenize(ctx, false, i_msg, slot.i_usr_tail - i_msg);
 
     // most recent user message
-    std::string msg;
-    int32_t i_head = copy_message(msg, slot.prompt_tokens, slot.prompt_tokens.size() - 1, false);
-    if (i_head < 0) { return -1; }
+    // std::string msg;
+    // int32_t i_head = copy_message(msg, slot.prompt_tokens, slot.prompt_tokens.size() - 1, false);
+    // if (i_head < 0) { return -1; }
 
-    // printf("\nuser message: %s\n", msg.data());
+    printf("\nlast user message:\n%s\n", msg.data());
     std::unordered_set<std::string> words;
     int i_word = -1;
     for (int i = 0; i < msg.size(); i++) {
@@ -3207,13 +3236,16 @@ int32_t server_context::echo_canceler(server_slot & slot) {
         }
     }
 
-    if (ass_head < 0 || ass_tail < 0) { return 0; }
+    if (ass_head_tok < 0 || ass_tail_tok < 0) { return 0; }
+
+    i_msg = slot.i_ass_head + 1;
+    msg = slot.prompt_tokens.detokenize(ctx, false, i_msg, slot.i_ass_tail - i_msg);
 
     // most recent assistant message
-    i_head = copy_message(msg, slot.prompt_tokens, i_head - 1, true);
-    if (i_head < 0) { return -2; }
+    // i_head = copy_message(msg, slot.prompt_tokens, i_head - 1, true);
+    // if (i_head < 0) { return -2; }
 
-    // printf("\nassistant message: %s\n", msg.data());
+    printf("\nlast assistant message:\n%s\n", msg.data());
     i_word = -1;
     bool in_quote = false;
     for (int i = 0; i < msg.size(); i++) {
@@ -3235,10 +3267,11 @@ int32_t server_context::echo_canceler(server_slot & slot) {
         }
     }
 
-    // for (const auto& word: words) {
-    //     printf("%s ", word.data());
-    // }
-    // printf("\n\n");
+    printf("\necho cancelled:");
+    for (const auto& word: words) {
+        printf("%s ", word.data());
+    }
+    printf("\n\n");
     for (const auto& word: words) { slot.ban_phrases.push_back(std::move(word)); }
     return 0;
 }

@@ -1963,6 +1963,20 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.ass_sfx = argv[i];
         return true;
     }
+    if (arg == "--echo-canceler") {
+        params.echo_canceler_on = true;
+        return true;
+    }
+    // if (arg == "--introduction-penalty-n") {
+    //     CHECK_ARG
+    //     params.intro_pen_n = std::stoi(argv[i]);
+    //     return true;
+    // }
+    // if (arg == "--introduction-penalty-bias") {
+    //     CHECK_ARG
+    //     params.intro_pen_bias = std::stoi(argv[i]);
+    //     return true;
+    // }
     if (arg == "--reasoning-format") {
         CHECK_ARG
         std::string value = argv[i];
