@@ -1967,6 +1967,11 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.echo_canceler_on = true;
         return true;
     }
+    if (arg == "--custom-alphas") {
+        CHECK_ARG
+        params.custom_alphas = argv[i];
+        return true;
+    }
     // if (arg == "--introduction-penalty-n") {
     //     CHECK_ARG
     //     params.intro_pen_n = std::stoi(argv[i]);

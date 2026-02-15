@@ -96,10 +96,14 @@ struct server_slot {
     float ban_phrases_bias = 0;
     int32_t banned_n = 1;
 
+    // indices to most recent messages
     int32_t i_usr_head = -1;
     int32_t i_usr_tail = -1;
     int32_t i_ass_head = -1;
     int32_t i_ass_tail = -1;
+
+    // for echo canceler
+    std::unordered_set<std::string> echo_bans;
 
     server_prompt server_cached_prompt;
 
@@ -259,6 +263,8 @@ struct server_context {
     llama_token ass_head_tok = -1;  // first token before assistant message
     llama_token ass_tail_tok = -1;  // first token after assistant message
 
+    bool rfind_messages = false;
+
     ~server_context();
 
     bool load_model(const gpt_params& params_);
@@ -354,13 +360,11 @@ struct server_context {
 
     void buffer_and_check_string_ban(server_slot& slot, completion_token_output& result);
 
-    // int32_t copy_message(std::string& msg, const server_tokens& tokens, const int32_t i_rbegin, const bool is_ass);
+    void rfind_user_message(server_slot & slot, const int32_t i_rbegin);
 
-    void find_previous_user_indices(server_slot & slot, const int32_t i_rbegin);
+    void rfind_assistant_message(server_slot & slot, const int32_t i_rbegin);
 
-    void find_previous_assistant_indices(server_slot & slot, const int32_t i_rbegin);
-
-    int32_t echo_canceler(server_slot & slot);
+    int32_t echo_canceler(server_slot & slot, const std::string & custom_alphas);
 
     json model_meta() const;
 

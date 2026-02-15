@@ -280,10 +280,11 @@ struct gpt_params {
     int32_t banned_n                 =  1; // number of tokens that are banned in the phrase
     size_t n_buffer 				 =  0; // number of token buffers for string ban
 
-    std::string ass_pfx              = "";
-    std::string ass_sfx              = "";
     std::string usr_pfx              = "";
     std::string usr_sfx              = "";
+    std::string ass_pfx              = "";
+    std::string ass_sfx              = "";
+    std::string custom_alphas        = "";
 
     bool echo_canceler_on            = false;
 
