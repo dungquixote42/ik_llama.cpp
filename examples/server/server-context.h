@@ -364,7 +364,7 @@ struct server_context {
 
     void rfind_assistant_message(server_slot & slot, const int32_t i_rbegin);
 
-    int32_t echo_canceler(server_slot & slot, const std::string & custom_alphas);
+    void echo_canceler(server_slot & slot, const std::string & custom_alphas);
 
     json model_meta() const;
 

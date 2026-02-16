@@ -501,6 +501,7 @@ std::string string_join(const std::vector<std::string>& values, const std::strin
 std::string string_strip(const std::string & str);
 std::string string_get_sortable_timestamp();
 std::string string_lower(const std::string & str);
+std::string string_get_word_lqq_decap(std::string & str, const int32_t i_word, const int32_t i_word_tail);
 
 static bool string_starts_with(const std::string& str,
     const std::string& prefix) {  // While we wait for C++20's std::string::starts_with...

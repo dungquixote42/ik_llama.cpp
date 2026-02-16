@@ -2751,6 +2751,15 @@ std::string string_lower(const std::string& str) {
     return result;
 }
 
+std::string string_get_word_lqq_decap(std::string & str, const int32_t i_word, const int32_t i_word_tail) {
+    const size_t word_len = i_word_tail - i_word;
+    std::string result;
+    result.reserve(1 + word_len);
+    result += '\"';
+    result.append(str, i_word, word_len);
+    result[1] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[1])));
+    return result;
+}
 
 void string_replace_all(std::string & s, const std::string & search, const std::string & replace) {
     if (search.empty()) {

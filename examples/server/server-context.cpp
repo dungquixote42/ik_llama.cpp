@@ -1171,6 +1171,7 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
     }
 
     {
+        printf("\nban string\n");
         // ban string
         const auto& banned_strings = data.find("banned_strings");
         if (banned_strings != data.end() && banned_strings->is_array()) {
@@ -3083,8 +3084,13 @@ inline int32_t check_ban_phrase(const server_slot& slot) {
     string_buffer = string_lower(string_buffer);
     for (auto it : slot.ban_phrases) {
         start = string_buffer.find(it);
+        // printf("%s\n", string_buffer.data());
 		// has been sorted from longest to shortest
         if (start != std::string::npos) {
+            printf("========================================================\n");
+            printf("%s\n", string_buffer.data());
+            printf("%s\n", it.data());
+            printf("========================================================\n");
             found = true;
             break;
         }
@@ -3162,38 +3168,6 @@ void server_context::buffer_and_check_string_ban(server_slot & slot, completion_
     }
 }
 
-// std::string get_word(std::string & text, const int32_t i_word, const int32_t i_word_tail,
-//         const bool capitalize, const bool add_lquote, const bool add_rquote) {
-//     std::string word = (add_lquote ? "\"" : "") + text.substr(i_word, i_word_tail - i_word) + (add_rquote ? "\"" : "");
-//     if (capitalize) {
-//         const uint8_t i_first = add_lquote ? 1 : 0;
-//         word[i_first] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[i_first])));
-//     }
-//     return word;
-// }
-
-std::string get_word(std::string & text, const int32_t i_word, const int32_t i_word_tail,
-        const bool capitalize, const bool add_lquote, const bool add_rquote) {
-    const size_t len_subs = i_word_tail - i_word;
-    const size_t len_word = len_subs + (add_lquote ? 1 : 0) + (add_rquote ? 1 : 0);
-    std::string word;
-    word.reserve(len_word);
-
-    uint8_t i_cap = 0;
-    if (add_lquote) {
-        word += '\"';
-        i_cap = 1;
-    }
-    // word.append(text.substr(i_word, len_subs));
-    word.append(text, i_word, len_subs);
-    if (add_rquote) word += '\"';
-
-    if (capitalize) {
-        word[i_cap] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[i_cap])));
-    }
-    return word;
-}
-
 void server_context::rfind_user_message(server_slot & slot, const int32_t i_rbegin) {
     if (usr_head_tok < 0 || usr_tail_tok < 0) { return; }
     if (i_rbegin >= slot.prompt_tokens.size()) { return; }
@@ -3216,7 +3190,9 @@ void server_context::rfind_assistant_message(server_slot & slot, const int32_t i
     slot.i_ass_head = idx;
 }
 
-int32_t server_context::echo_canceler(server_slot & slot, const std::string & custom_alphas) {
+void server_context::echo_canceler(server_slot & slot, const std::string & custom_alphas) {
+    slot.echo_bans.clear();
+
     auto _isalpha = [](const unsigned char letter) {
         return std::isalpha(letter);
     };
@@ -3229,7 +3205,7 @@ int32_t server_context::echo_canceler(server_slot & slot, const std::string & cu
     const int32_t i_usr_msg = slot.i_usr_head + 1;
     if ((0 < i_usr_msg) && (i_usr_msg < slot.i_usr_tail)) {
         std::string usr_msg = slot.prompt_tokens.detokenize(ctx, false, i_usr_msg, slot.i_usr_tail - i_usr_msg);
-        printf("\nlast user message:\n%s\n", usr_msg.data());
+        // printf("\nlast user message:\n%s\n", usr_msg.data());
 
         int32_t i_word = -1;
         for (int i = 0; i < usr_msg.size(); i++) {
@@ -3237,7 +3213,7 @@ int32_t server_context::echo_canceler(server_slot & slot, const std::string & cu
             if (my_isalpha(letter)) {
                 if (i_word < 0) i_word = i;
             }  else if (i_word >= 0) {
-                slot.echo_bans.insert(std::move(get_word(usr_msg, i_word, i, true, true, false)));
+                slot.echo_bans.insert(std::move(string_get_word_lqq_decap(usr_msg, i_word, i)));
                 i_word = -1;
             }
         }
@@ -3246,7 +3222,7 @@ int32_t server_context::echo_canceler(server_slot & slot, const std::string & cu
     const int32_t i_ass_msg = slot.i_ass_head + 1;
     if ((0 < i_ass_msg) && (i_ass_msg < slot.i_ass_tail)) {
         std::string ass_msg = slot.prompt_tokens.detokenize(ctx, false, i_ass_msg, slot.i_ass_tail - i_ass_msg);
-        printf("\nlast assistant message:\n%s\n", ass_msg.data());
+        // printf("\nlast assistant message:\n%s\n", ass_msg.data());
 
         bool in_quote = false;
         int32_t i_word = -1;
@@ -3256,14 +3232,14 @@ int32_t server_context::echo_canceler(server_slot & slot, const std::string & cu
                 in_quote = !in_quote;
                 if (!in_quote && (i_word >= 0)) {
                     // closing quote
-                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i, true, true, false)));
+                    slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
                     i_word = -1;
                 }
             } else if (in_quote) {
                 if (my_isalpha(letter)) {
                     if (i_word < 0) i_word = i;
                 } else if (i_word >= 0) {
-                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i, true, true, false)));
+                    slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
                     i_word = -1;
                 }
             }
@@ -3275,8 +3251,18 @@ int32_t server_context::echo_canceler(server_slot & slot, const std::string & cu
         printf("%s ", word.data());
     }
     printf("\n\n");
-    for (const auto& word: slot.echo_bans) { slot.ban_phrases.push_back(std::move(word)); }
-    return 0;
+
+    size_t max_ban_tokens = 0;
+    for (const auto& word: slot.echo_bans) {
+        auto ban_tokens = common_tokenize(llama_get_model(ctx), word, false, true);
+        max_ban_tokens = std::max(max_ban_tokens, ban_tokens.size());
+        slot.ban_phrases.push_back(std::move(word));
+    }
+    slot.n_buffer = std::max(slot.n_buffer, max_ban_tokens + 3);
+    std::sort(slot.ban_phrases.begin(), slot.ban_phrases.end(), [](const std::string& a, const std::string& b) {
+        return a.length() > b.length();
+    });
+    slot.logit_bias = slot.sparams.logit_bias; // keep a copy to restore
 }
 
 void server_context::process_batch_tokens(int32_t & n_batch) {
