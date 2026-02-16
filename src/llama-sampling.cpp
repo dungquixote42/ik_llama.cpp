@@ -575,12 +575,6 @@ void llama_sample_repetition_penalties_impl(
     }
 }
 
-void llama_sample_introduction_penalty_impl(
-
-    ) {
-    
-}
-
 void llama_sample_apply_guidance_impl(
         struct llama_sampling * smpl,
                         float * logits,

@@ -96,7 +96,7 @@ struct server_slot {
     float ban_phrases_bias = 0;
     int32_t banned_n = 1;
 
-    // indices to most recent messages
+    // indices to recent messages
     int32_t i_usr_head = -1;
     int32_t i_usr_tail = -1;
     int32_t i_ass_head = -1;
@@ -364,7 +364,9 @@ struct server_context {
 
     void rfind_assistant_message(server_slot & slot, const int32_t i_rbegin);
 
-    void echo_canceler(server_slot & slot, const std::string & custom_alphas);
+    void apply_echo_canceler(server_slot & slot, const std::string & custom_alphas);
+
+    void apply_introduction_penalty(server_slot & slot);
 
     json model_meta() const;
 

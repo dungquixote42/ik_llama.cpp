@@ -271,6 +271,10 @@ struct gpt_params {
     std::string lookup_cache_dynamic = ""; // path of dynamic ngram cache file for lookup decoding
     std::string logits_file          = ""; // file for saving *all* logits
     std::string rpc_servers          = ""; // comma separated list of RPC servers
+    std::string usr_pfx              = "";
+    std::string usr_sfx              = "";
+    std::string ass_pfx              = "";
+    std::string ass_sfx              = "";
 
     std::string cuda_params          = ""; // comma separated list of cuda parameters key=value1,key2=value2
 
@@ -280,13 +284,10 @@ struct gpt_params {
     int32_t banned_n                 =  1; // number of tokens that are banned in the phrase
     size_t n_buffer 				 =  0; // number of token buffers for string ban
 
-    std::string usr_pfx              = "";
-    std::string usr_sfx              = "";
-    std::string ass_pfx              = "";
-    std::string ass_sfx              = "";
+    bool        echo_canceler_on     = false;
     std::string custom_alphas        = "";
-
-    bool echo_canceler_on            = false;
+    int32_t     intro_pen_n          = 0;
+    int32_t     intro_pen_bias       = 0;
 
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;

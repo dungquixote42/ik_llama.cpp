@@ -1171,7 +1171,6 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
     }
 
     {
-        printf("\nban string\n");
         // ban string
         const auto& banned_strings = data.find("banned_strings");
         if (banned_strings != data.end() && banned_strings->is_array()) {
@@ -2913,9 +2912,9 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                         rfind_user_message(slot, slot.prompt_tokens.size() - 1);
                         rfind_assistant_message(slot, slot.i_usr_head);
 
-                        if (params_base.echo_canceler_on) { echo_canceler(slot, params_base.custom_alphas); }
+                        if (params_base.echo_canceler_on) { apply_echo_canceler(slot, params_base.custom_alphas); }
 
-                        
+                        if (params_base.intro_pen_n > 0) { apply_introduction_penalty(slot); }
                     }
 
                     common_sampler_reset(slot.ctx_sampling);
@@ -3087,13 +3086,7 @@ inline int32_t check_ban_phrase(const server_slot& slot) {
     string_buffer = string_lower(string_buffer);
     for (auto it : slot.ban_phrases) {
         start = string_buffer.find(it);
-        // printf("%s\n", string_buffer.data());
-		// has been sorted from longest to shortest
         if (start != std::string::npos) {
-            printf("========================================================\n");
-            printf("%s\n", string_buffer.data());
-            printf("%s\n", it.data());
-            printf("========================================================\n");
             found = true;
             break;
         }
@@ -3193,7 +3186,18 @@ void server_context::rfind_assistant_message(server_slot & slot, const int32_t i
     slot.i_ass_head = idx;
 }
 
-void server_context::echo_canceler(server_slot & slot, const std::string & custom_alphas) {
+std::string get_word(std::string & str, const int32_t i_word, const int32_t i_word_tail) {
+    const size_t word_len = i_word_tail - i_word;
+    std::string result;
+    result.reserve(2 + word_len);
+    result += '\"';
+    result += '*';
+    result.append(str, i_word, word_len);
+    result[2] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[2])));
+    return result;
+}
+
+void server_context::apply_echo_canceler(server_slot & slot, const std::string & custom_alphas) {
     slot.echo_bans.clear();
 
     auto _isalpha = [](const unsigned char letter) {
@@ -3217,6 +3221,7 @@ void server_context::echo_canceler(server_slot & slot, const std::string & custo
                 if (i_word < 0) i_word = i;
             }  else if (i_word >= 0) {
                 slot.echo_bans.insert(std::move(string_get_word_lqq_decap(usr_msg, i_word, i)));
+                slot.echo_bans.insert(std::move(get_word(usr_msg, i_word, i)));
                 i_word = -1;
             }
         }
@@ -3236,6 +3241,7 @@ void server_context::echo_canceler(server_slot & slot, const std::string & custo
                 if (!in_quote && (i_word >= 0)) {
                     // closing quote
                     slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
+                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i)));
                     i_word = -1;
                 }
             } else if (in_quote) {
@@ -3243,17 +3249,18 @@ void server_context::echo_canceler(server_slot & slot, const std::string & custo
                     if (i_word < 0) i_word = i;
                 } else if (i_word >= 0) {
                     slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
+                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i)));
                     i_word = -1;
                 }
             }
         }
     }
 
-    printf("\necho cancelled:\n");
-    for (const auto& word: slot.echo_bans) {
-        printf("%s ", word.data());
-    }
-    printf("\n\n");
+    // printf("\necho cancelled:\n");
+    // for (const auto& word: slot.echo_bans) {
+    //     printf("%s ", word.data());
+    // }
+    // printf("\n\n");
 
     size_t max_ban_tokens = 0;
     for (const auto& word: slot.echo_bans) {
@@ -3266,6 +3273,18 @@ void server_context::echo_canceler(server_slot & slot, const std::string & custo
         return a.length() > b.length();
     });
     slot.logit_bias = slot.sparams.logit_bias; // keep a copy to restore
+}
+
+void server_context::apply_introduction_penalty(server_slot & slot) {
+    const int32_t i_ass_msg = slot.i_ass_head + 1;
+    if ((0 < i_ass_msg) && (i_ass_msg < slot.i_ass_tail)) {
+        const int32_t n_penalty = std::min(params_base.intro_pen_n, slot.i_ass_tail - i_ass_msg);
+        for (int32_t i = i_ass_msg; i < n_penalty; ++i) {
+            slot.sparams.logit_bias[slot.prompt_tokens[i]] += params_base.intro_pen_bias;
+        }
+        // std::string msg = slot.prompt_tokens.detokenize(ctx, false, i_ass_msg, n_penalty);
+        // printf("\n\n%s\n\n", msg.data());
+    }
 }
 
 void server_context::process_batch_tokens(int32_t & n_batch) {
