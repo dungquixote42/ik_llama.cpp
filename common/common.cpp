@@ -1995,12 +1995,6 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.custom_alphas = argv[i];
         return true;
     }
-    if (arg == "--reasoning-format") {
-        CHECK_ARG
-        std::string value = argv[i];
-        params.reasoning_format = common_reasoning_format_from_name(value);
-        return true;
-    }
     if (arg == "--no-prefill-assistant") {
         CHECK_ARG
         params.prefill_assistant = false;
@@ -2773,6 +2767,7 @@ std::string string_lower(const std::string& str) {
     }
     return result;
 }
+
 
 void string_replace_all(std::string & s, const std::string & search, const std::string & replace) {
     if (search.empty()) {

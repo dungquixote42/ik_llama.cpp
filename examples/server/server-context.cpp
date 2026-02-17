@@ -2889,6 +2889,7 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
 
                     slot.cache_tokens.push_back(cur_tok);
 
+
                     slot.n_prompt_tokens_processed++;
                     slot_npast++;
                     slot.n_past_prompt++;
@@ -3084,6 +3085,7 @@ inline int32_t check_ban_phrase(const server_slot& slot) {
     string_buffer = string_lower(string_buffer);
     for (auto it : slot.ban_phrases) {
         start = string_buffer.find(it);
+        // has been sorted from longest to shortest
         if (start != std::string::npos) {
             found = true;
             break;
@@ -3371,15 +3373,6 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
             if (slot.i_batch_dft.size() > 0) {
                 continue; // sample using speculative decoding
             }
-
-            // printf("\n================================================================================\n");
-            // apply_introduction_penalty(slot);
-            // float * logits = llama_get_logits_ith(ctx, slot.i_batch - i);
-            // for (const auto& id: slot.intro_tokens) {
-            //     logits[id] += params_base.intro_penalty_bias;
-            //     // printf("%d ", id);
-            // }
-            // printf("\n================================================================================\n");
 
             completion_token_output result;
             const int tok_idx = slot.i_batch - i;
