@@ -106,6 +106,10 @@ typedef struct common_params_sampling {
 
     std::vector<llama_token> penalty_prompt_tokens;
     bool                     use_penalty_prompt_tokens = false;
+
+    std::vector<llama_token> intro_penalty_tokens = {};
+    float                    intro_penalty_bias   = 0;
+
 } llama_sampling_params;
 
 // general sampler context

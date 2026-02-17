@@ -180,7 +180,7 @@ void server_context::init() {
         usr_head_token = tokens.back();
     }
 
-    if ((params_base.intro_penalty_n > 0) ||
+    if ((params_base.intro_penalty_n != 0) ||
         params_base.echo_canceler_on) { rfind_messages = true; }
 
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
@@ -2919,7 +2919,7 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                     if (rfind_messages) {
                         rfind_user_message(slot, slot.prompt_tokens.size() - 1);
                         rfind_assistant_message(slot, slot.i_usr_head);
-                        if (params_base.intro_penalty_n > 0) { prepare_introduction_penalty(slot); }
+                        prepare_introduction_penalty(slot);
                         if (params_base.echo_canceler_on) { apply_echo_canceler(slot); }
                     }
 
@@ -3272,18 +3272,27 @@ void server_context::apply_echo_canceler(server_slot & slot) {
 }
 
 void server_context::prepare_introduction_penalty(server_slot & slot) {
-    slot.intro_tokens.clear();
-    const int32_t i_ass_msg = slot.i_ass_head + 1;
-    if ((0 < i_ass_msg) && (i_ass_msg < slot.i_ass_tail)) {
-        const int32_t n_penalty = std::min(params_base.intro_penalty_n, slot.i_ass_tail - i_ass_msg);
-        // printf("\n================================================================================");
-        for (int32_t i = i_ass_msg; i < i_ass_msg + n_penalty; ++i) {
-            slot.intro_tokens.insert(slot.prompt_tokens[i]);
-        }
-        // std::string msg = slot.prompt_tokens.detokenize(ctx, false, i_ass_msg, n_penalty);
-        // printf("\n%s\n", msg.data());
-        // printf("================================================================================\n\n");
+    if (params_base.intro_penalty_n == 0) {
+        // disabled
+        return;
     }
+
+    const int32_t i_ass_msg = slot.i_ass_head + 1;
+    const int32_t ass_msg_len = slot.i_ass_tail - i_ass_msg;
+    if (ass_msg_len <= 0) {
+        // no assistant message
+        return;
+    }
+
+    const int32_t n_penalty = std::min((size_t) ass_msg_len, params_base.intro_penalty_n);
+    slot.ctx_sampling->params.intro_penalty_tokens.clear();
+    // printf("\n================================================================================");
+    for (int32_t i = i_ass_msg; i < i_ass_msg + n_penalty; ++i) {
+        slot.ctx_sampling->params.intro_penalty_tokens.push_back(slot.prompt_tokens[i]);
+    }
+    // std::string msg = slot.prompt_tokens.detokenize(ctx, false, i_ass_msg, n_penalty);
+    // printf("\n%s\n", msg.data());
+    // printf("================================================================================\n\n");
 }
 
 void server_context::process_batch_tokens(int32_t & n_batch) {
@@ -3363,16 +3372,14 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
                 continue; // sample using speculative decoding
             }
 
-            if (slot.n_decoded < params_base.intro_penalty_n) {
-                // printf("\n================================================================================\n");
-                // apply_introduction_penalty(slot);
-                float * logits = llama_get_logits_ith(ctx, slot.i_batch - i);
-                for (const auto& id: slot.intro_tokens) {
-                    logits[id] += params_base.intro_penalty_bias;
-                    // printf("%d ", id);
-                }
-                // printf("\n================================================================================\n");
-            }
+            // printf("\n================================================================================\n");
+            // apply_introduction_penalty(slot);
+            // float * logits = llama_get_logits_ith(ctx, slot.i_batch - i);
+            // for (const auto& id: slot.intro_tokens) {
+            //     logits[id] += params_base.intro_penalty_bias;
+            //     // printf("%d ", id);
+            // }
+            // printf("\n================================================================================\n");
 
             completion_token_output result;
             const int tok_idx = slot.i_batch - i;

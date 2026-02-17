@@ -105,9 +105,6 @@ struct server_slot {
     // for echo canceler
     std::unordered_set<std::string> echo_bans;
 
-    // for introduction penalty
-    std::unordered_set<llama_token> intro_tokens;
-
     server_prompt server_cached_prompt;
 
     void prompt_save(server_prompt_cache& prompt_cache) const;

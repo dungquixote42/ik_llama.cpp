@@ -286,8 +286,8 @@ struct gpt_params {
 
     bool        echo_canceler_on     = false;
     std::string custom_alphas        = "";
-    int32_t     intro_penalty_n      = 0;
-    int32_t     intro_penalty_bias   = 0;
+
+    size_t intro_penalty_n = 0;
 
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;

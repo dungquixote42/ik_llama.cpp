@@ -946,7 +946,7 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
     }
     if (arg == "--introduction-penalty-bias") {
         CHECK_ARG
-        params.intro_penalty_bias = std::stoi(argv[i]);
+        sparams.intro_penalty_bias = std::stof(argv[i]);
         return true;
     }
     if (arg == "--adaptive-target") {
