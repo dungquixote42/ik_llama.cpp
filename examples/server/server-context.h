@@ -105,6 +105,9 @@ struct server_slot {
     // for echo canceler
     std::unordered_set<std::string> echo_bans;
 
+    // for introduction penalty
+    std::unordered_set<llama_token> intro_tokens;
+
     server_prompt server_cached_prompt;
 
     void prompt_save(server_prompt_cache& prompt_cache) const;
@@ -258,10 +261,10 @@ struct server_context {
     int32_t cache_ram_n_min = 0;
     float cache_ram_similarity = 0.5f;
 
-    llama_token usr_head_tok = -1;  // first token before user message
-    llama_token usr_tail_tok = -1;  // first token after user message
-    llama_token ass_head_tok = -1;  // first token before assistant message
-    llama_token ass_tail_tok = -1;  // first token after assistant message
+    llama_token usr_head_token = -1;    // first token before user message
+    llama_token usr_tail_token = -1;    // first token after user message
+    llama_token ass_head_token = -1;    // first token before assistant message
+    llama_token ass_tail_token = -1;    // first token after assistant message
 
     bool rfind_messages = false;
 
@@ -364,13 +367,13 @@ struct server_context {
 
     void rfind_assistant_message(server_slot & slot, const int32_t i_rbegin);
 
-    void apply_echo_canceler(server_slot & slot, const std::string & custom_alphas);
-
-    void apply_introduction_penalty(server_slot & slot);
+    void prepare_introduction_penalty(server_slot & slot);
 
     json model_meta() const;
 
     // Re-aggregates all active vectors and updates the model state
     bool apply_control_vectors_internal();
+
+    void apply_echo_canceler(server_slot & slot);
 
 };

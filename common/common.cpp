@@ -937,18 +937,14 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         }
         return true;
     }
-    if (arg == "--echo-canceler") {
-        params.echo_canceler_on = true;
-        return true;
-    }
     if (arg == "--introduction-penalty-n") {
         CHECK_ARG
-        params.intro_pen_n = std::stoi(argv[i]);
+        params.intro_penalty_n = std::stoi(argv[i]);
         return true;
     }
     if (arg == "--introduction-penalty-bias") {
         CHECK_ARG
-        params.intro_pen_bias = std::stoi(argv[i]);
+        params.intro_penalty_bias = std::stoi(argv[i]);
         return true;
     }
     if (arg == "--adaptive-target") {
@@ -2773,16 +2769,6 @@ std::string string_lower(const std::string& str) {
             c = static_cast<char>(c + ('a' - 'A')); 
         }
     }
-    return result;
-}
-
-std::string string_get_word_lqq_decap(std::string & str, const int32_t i_word, const int32_t i_word_tail) {
-    const size_t word_len = i_word_tail - i_word;
-    std::string result;
-    result.reserve(1 + word_len);
-    result += '\"';
-    result.append(str, i_word, word_len);
-    result[1] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[1])));
     return result;
 }
 

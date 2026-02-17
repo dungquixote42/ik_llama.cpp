@@ -63,8 +63,6 @@ typedef struct common_params_sampling {
     float       dry_base = 1.75f; // 0.0 = disabled;      multiplier * base ^ (length of sequence before token - allowed length)
     int32_t   dry_allowed_length = 2;     // tokens extending repetitions beyond this receive penalty
     int32_t   dry_penalty_last_n = -1;    // how many tokens to scan for repetitions (0 = disable penalty, -1 = context size)
-    // uint32_t    intro_pen_n           = 0;
-    // int32_t     intro_pen_bias        = 0;
     int32_t   total_context_size = 16840;
     int32_t   mirostat              = 0;                  // 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     float       mirostat_tau          = 5.00f;              // target entropy

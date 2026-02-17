@@ -170,17 +170,18 @@ void server_context::init() {
     scratch = params_base.usr_sfx + params_base.ass_pfx;
     if (!scratch.empty()) {
         auto tokens = common_tokenize(ctx, scratch, false, true);
-        usr_tail_tok = tokens[0];
-        ass_head_tok = tokens.back();
+        usr_tail_token = tokens[0];
+        ass_head_token = tokens.back();
     }
     scratch = params_base.ass_sfx + params_base.usr_pfx;
     if (!scratch.empty()) {
         auto tokens = common_tokenize(ctx, scratch, false, true);
-        ass_tail_tok = tokens[0];
-        usr_head_tok = tokens.back();
+        ass_tail_token = tokens[0];
+        usr_head_token = tokens.back();
     }
 
-    if (params_base.echo_canceler_on) { rfind_messages = true; }
+    if ((params_base.intro_penalty_n > 0) ||
+        params_base.echo_canceler_on) { rfind_messages = true; }
 
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
 
@@ -2907,22 +2908,19 @@ void server_context::batch_pending_prompt(const int32_t n_ubatch, const int32_t 
                     slot.command = SLOT_COMMAND_NONE;
                     GGML_ASSERT(batch.n_tokens > 0);
                     GGML_ASSERT((size_t)slot.n_prompt_tokens == slot.prompt_tokens.size());
-
-                    if (rfind_messages) {
-                        rfind_user_message(slot, slot.prompt_tokens.size() - 1);
-                        rfind_assistant_message(slot, slot.i_usr_head);
-
-                        if (params_base.echo_canceler_on) { apply_echo_canceler(slot, params_base.custom_alphas); }
-
-                        if (params_base.intro_pen_n > 0) { apply_introduction_penalty(slot); }
-                    }
-
                     common_sampler_reset(slot.ctx_sampling);
                     for (int i = 0; i < slot.n_prompt_tokens; ++i) {
                         llama_token id = slot.prompt_tokens[i];
                         if (id != LLAMA_TOKEN_NULL) {
                             common_sampler_accept(slot.ctx_sampling, ctx, id, false);
                         }
+                    }
+
+                    if (rfind_messages) {
+                        rfind_user_message(slot, slot.prompt_tokens.size() - 1);
+                        rfind_assistant_message(slot, slot.i_usr_head);
+                        if (params_base.intro_penalty_n > 0) { prepare_introduction_penalty(slot); }
+                        if (params_base.echo_canceler_on) { apply_echo_canceler(slot); }
                     }
 
                     // extract the logits only for the last token
@@ -3165,49 +3163,51 @@ void server_context::buffer_and_check_string_ban(server_slot & slot, completion_
 }
 
 void server_context::rfind_user_message(server_slot & slot, const int32_t i_rbegin) {
-    if (usr_head_tok < 0 || usr_tail_tok < 0) { return; }
+    if (usr_head_token < 0 || usr_tail_token < 0) { return; }
     if (i_rbegin >= slot.prompt_tokens.size()) { return; }
 
     int32_t idx = i_rbegin;
-    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_tail_tok) { --idx; }
+    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_tail_token) { --idx; }
     slot.i_usr_tail = idx--;
-    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_head_tok) { --idx; }
+    while ((idx >= 0) && slot.prompt_tokens[idx] != usr_head_token) { --idx; }
     slot.i_usr_head = idx;
 }
 
 void server_context::rfind_assistant_message(server_slot & slot, const int32_t i_rbegin) {
-    if (ass_head_tok < 0 || ass_tail_tok < 0) { return; }
+    if (ass_head_token < 0 || ass_tail_token < 0) { return; }
     if (i_rbegin >= slot.prompt_tokens.size()) { return; }
 
     int32_t idx = i_rbegin;
-    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_tail_tok) { --idx; }
+    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_tail_token) { --idx; }
     slot.i_ass_tail = idx--;
-    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_head_tok) { --idx; }
+    while ((idx >= 0) && slot.prompt_tokens[idx] != ass_head_token) { --idx; }
     slot.i_ass_head = idx;
 }
 
-std::string get_word(std::string & str, const int32_t i_word, const int32_t i_word_tail) {
-    const size_t word_len = i_word_tail - i_word;
-    std::string result;
-    result.reserve(2 + word_len);
-    result += '\"';
-    result += '*';
-    result.append(str, i_word, word_len);
-    result[2] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[2])));
-    return result;
-}
-
-void server_context::apply_echo_canceler(server_slot & slot, const std::string & custom_alphas) {
+void server_context::apply_echo_canceler(server_slot & slot) {
     slot.echo_bans.clear();
 
-    auto _isalpha = [](const unsigned char letter) {
+    auto _isalpha_wo_custom = [](const unsigned char letter) {
         return std::isalpha(letter);
     };
-    auto _isalpha_w_custom = [&custom_alphas](const unsigned char letter) {
+    auto & custom_alphas = params_base.custom_alphas;
+    auto _isalpha_w_custom = [& custom_alphas](const unsigned char letter) {
         return std::isalpha(letter) || (custom_alphas.find(letter) != std::string::npos);
     };
-    std::function<bool(unsigned char)> my_isalpha = _isalpha_w_custom;
-    if (custom_alphas.empty()) { my_isalpha = _isalpha; }
+    std::function<bool(unsigned char)> _isalpha = _isalpha_w_custom;
+    if (custom_alphas.empty()) { _isalpha = _isalpha_wo_custom; }
+
+    auto ban_echoes = [&slot](const std::string & msg, const int32_t i_word, const int32_t i_word_tail) {
+        const size_t word_len = i_word_tail - i_word;
+        const std::string word = string_lower(msg.substr(i_word, word_len));
+        slot.echo_bans.insert("\"" + word);
+        slot.echo_bans.insert("\"*" + word);
+        slot.echo_bans.insert("\"**" + word);
+        slot.echo_bans.insert("\"\n" + word);
+        slot.echo_bans.insert("\"\n" + word);
+        slot.echo_bans.insert("\"\n*" + word);
+        slot.echo_bans.insert("\"\n**" + word);
+    };
 
     const int32_t i_usr_msg = slot.i_usr_head + 1;
     if ((0 < i_usr_msg) && (i_usr_msg < slot.i_usr_tail)) {
@@ -3217,11 +3217,10 @@ void server_context::apply_echo_canceler(server_slot & slot, const std::string &
         int32_t i_word = -1;
         for (int i = 0; i < usr_msg.size(); i++) {
             const unsigned char letter = static_cast<unsigned char>(usr_msg[i]);
-            if (my_isalpha(letter)) {
+            if (_isalpha(letter)) {
                 if (i_word < 0) i_word = i;
             }  else if (i_word >= 0) {
-                slot.echo_bans.insert(std::move(string_get_word_lqq_decap(usr_msg, i_word, i)));
-                slot.echo_bans.insert(std::move(get_word(usr_msg, i_word, i)));
+                ban_echoes(usr_msg, i_word, i);
                 i_word = -1;
             }
         }
@@ -3240,16 +3239,14 @@ void server_context::apply_echo_canceler(server_slot & slot, const std::string &
                 in_quote = !in_quote;
                 if (!in_quote && (i_word >= 0)) {
                     // closing quote
-                    slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
-                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i)));
+                    ban_echoes(ass_msg, i_word, i);
                     i_word = -1;
                 }
             } else if (in_quote) {
-                if (my_isalpha(letter)) {
+                if (_isalpha(letter)) {
                     if (i_word < 0) i_word = i;
                 } else if (i_word >= 0) {
-                    slot.echo_bans.insert(std::move(string_get_word_lqq_decap(ass_msg, i_word, i)));
-                    slot.echo_bans.insert(std::move(get_word(ass_msg, i_word, i)));
+                    ban_echoes(ass_msg, i_word, i);
                     i_word = -1;
                 }
             }
@@ -3262,28 +3259,30 @@ void server_context::apply_echo_canceler(server_slot & slot, const std::string &
     // }
     // printf("\n\n");
 
-    size_t max_ban_tokens = 0;
+    static constexpr int32_t margin = 3;
+    int32_t max_tokens = -margin;
     for (const auto& word: slot.echo_bans) {
-        auto ban_tokens = common_tokenize(llama_get_model(ctx), word, false, true);
-        max_ban_tokens = std::max(max_ban_tokens, ban_tokens.size());
+        max_tokens = std::max(max_tokens, (int32_t) common_tokenize(llama_get_model(ctx), word, false, true).size());
         slot.ban_phrases.push_back(std::move(word));
     }
-    slot.n_buffer = std::max(slot.n_buffer, max_ban_tokens + 3);
+    slot.n_buffer = std::max(slot.n_buffer, (size_t) (max_tokens + margin));
     std::sort(slot.ban_phrases.begin(), slot.ban_phrases.end(), [](const std::string& a, const std::string& b) {
         return a.length() > b.length();
     });
-    slot.logit_bias = slot.sparams.logit_bias; // keep a copy to restore
 }
 
-void server_context::apply_introduction_penalty(server_slot & slot) {
+void server_context::prepare_introduction_penalty(server_slot & slot) {
+    slot.intro_tokens.clear();
     const int32_t i_ass_msg = slot.i_ass_head + 1;
     if ((0 < i_ass_msg) && (i_ass_msg < slot.i_ass_tail)) {
-        const int32_t n_penalty = std::min(params_base.intro_pen_n, slot.i_ass_tail - i_ass_msg);
-        for (int32_t i = i_ass_msg; i < n_penalty; ++i) {
-            slot.sparams.logit_bias[slot.prompt_tokens[i]] += params_base.intro_pen_bias;
+        const int32_t n_penalty = std::min(params_base.intro_penalty_n, slot.i_ass_tail - i_ass_msg);
+        // printf("\n================================================================================");
+        for (int32_t i = i_ass_msg; i < i_ass_msg + n_penalty; ++i) {
+            slot.intro_tokens.insert(slot.prompt_tokens[i]);
         }
         // std::string msg = slot.prompt_tokens.detokenize(ctx, false, i_ass_msg, n_penalty);
-        // printf("\n\n%s\n\n", msg.data());
+        // printf("\n%s\n", msg.data());
+        // printf("================================================================================\n\n");
     }
 }
 
@@ -3362,6 +3361,17 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
 
             if (slot.i_batch_dft.size() > 0) {
                 continue; // sample using speculative decoding
+            }
+
+            if (slot.n_decoded < params_base.intro_penalty_n) {
+                // printf("\n================================================================================\n");
+                // apply_introduction_penalty(slot);
+                float * logits = llama_get_logits_ith(ctx, slot.i_batch - i);
+                for (const auto& id: slot.intro_tokens) {
+                    logits[id] += params_base.intro_penalty_bias;
+                    // printf("%d ", id);
+                }
+                // printf("\n================================================================================\n");
             }
 
             completion_token_output result;

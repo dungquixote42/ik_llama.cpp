@@ -484,9 +484,12 @@ static llama_token_data_array llama_sampling_prepare_impl(
     }
 
     // apply params.logit_bias map
+    // printf("\n================================================================================\n");
     for (auto it = params.logit_bias.begin(); it != params.logit_bias.end(); it++) {
         logits[it->first] += it->second;
+        // printf("%d ", it->first);
     }
+    // printf("\n================================================================================\n\n");
 
     if (ctx_cfg) {
         float * logits_guidance = llama_get_logits_ith(ctx_cfg, idx);
