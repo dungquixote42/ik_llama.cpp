@@ -22,17 +22,6 @@
 
 bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
     const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
-    // for (const auto& cpt: cpts) {
-    //     bool found = false;
-    //     for (const auto& uscript: uscripts) {
-    //         const auto& ranges = unicode_scripts_ranges[uscript];
-    //         auto it = std::lower_bound(ranges.first.begin(), ranges.first.end(), cpt);
-    //         if (it < ranges.first.end()) {
-    //             found = cpt <= ranges.second[std::distance(ranges.first.begin(), it)];
-    //         }
-    //     }
-    //     if (!found) { return false; }
-    // }
     bool found = true;
     for (size_t i = 0; found && (i < cpts.size()); ++i) {
         const uint32_t cpt = cpts[i];

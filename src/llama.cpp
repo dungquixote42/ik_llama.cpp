@@ -8480,21 +8480,6 @@ void llama_set_draft_input_hidden_state(struct llama_context * ctx, const float 
     ctx->draft_input_hidden_state = hidden_state;
 }
 
-// void * llama_cpts_from_utf8(void * utf8) {
-//     static std::vector<uint32_t> cpts;
-//     cpts = unicode_cpts_from_utf8(*(std::string*)utf8);
-//     return &cpts;
-// }
-
-// bool llama_cpts_in_uscripts(void * cpts) {
-//     for (const auto & cpt : *(std::vector<uint32_t>*)cpts) {
-//         if (!unicode_cpt_in_uscripts(cpt)) {
-//             return false;
-//         }
-//     }
-//     return true;
-// }
-
 bool llama_utf8_in_uscripts(void* utf8, void* uscripts) {
     return unicode_utf8_in_uscripts(*(std::string*)utf8, *(std::vector<std::string>*)uscripts);
 }
@@ -8502,34 +8487,3 @@ bool llama_utf8_in_uscripts(void* utf8, void* uscripts) {
 void llama_apply_bias(const int n_vocab, float* logits, float* bias) {
     llama_sample_apply_bias(n_vocab, logits, bias);
 }
-
-// void llama_apply_uscripts_bias(void* uscripts_bias) {
-//     llama_sampler_apply_uscripts_bias(*(std::vector<float>*)uscripts_bias);
-// }
-
-// void llama_apply_uscripts_bias(const struct llama_model* model) {
-//         const llama_vocab* vocab = llama_model_get_vocab(model);
-//         const int32_t n_vocab = llama_vocab_n_tokens(vocab);
-//         uscripts_bias.reserve(n_vocab);
-//         for (int32_t id = 0; id < n_vocab; ++id) {
-//             std::string utf8 = common_detokenize(vocab, { id }, false);
-//             if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &params_base.uscripts)) {
-//                 uscripts_bias[id] = -999.0f;
-//             } else {
-//                 uscripts_bias[id] = 0.0f;
-//             }
-//         }
-//         llama_apply_uscripts_bias(&uscripts_bias);
-// }
-
-// void llama_apply_uscripts_bias(void* uscripts, void* uscripts_bias) {
-//         for (size_t id = 0; id < n_bias; ++id) {
-//             std::string utf8 = common_detokenize(vocab, { id }, false);
-//             if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &params_base.uscripts)) {
-//                 bias[id] = -999.0f;
-//             } else {
-//                 bias[id] = 0.0f;
-//             }
-//         }
-//         llama_apply_uscripts_bias(&uscripts_bias);
-// }
