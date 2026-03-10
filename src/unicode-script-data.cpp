@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-constexpr std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts_ranges = {
+const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts_ranges = {
 { "common", { {
     0x000000,
     0x00005B,
