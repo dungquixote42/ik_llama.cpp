@@ -32,6 +32,8 @@ void iqk_hadamard(struct ggml_tensor * dst, int ith, int nth);
 
 float iqk_exp_with_thresh(int n, float * logits, float max, float min);
 
+void iqk_vvecadd_f32(int n, float * logits, float * bias);
+
 #ifdef __cplusplus
 }
 #endif

@@ -169,6 +169,36 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
+    auto& uscripts = params_base.uscripts;
+    if (uscripts.size() > 0) {
+        if (!params_base.un_common && (find(uscripts.begin(), uscripts.end(), "common") == uscripts.end())) {
+            uscripts.push_back("common");
+        }
+        if (!params_base.un_latin && (find(uscripts.begin(), uscripts.end(), "latin") == uscripts.end())) {
+            uscripts.push_back("latin");
+        }
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
+        // uscripts_bias.reserve(llama_vocab_n_tokens(llama_model_get_vocab(model)));
+        // llama_apply_uscripts_bias(uscripts_bias.data(), uscripts_bias.size());
+
+        for (int32_t id = 0; id < n_vocab; ++id) {
+            std::string utf8 = common_detokenize(vocab, { id }, false);
+            if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &params_base.uscripts)) {
+                uscripts_bias[id] = -999.0f;
+            } else {
+                uscripts_bias[id] = 0.0f;
+            }
+            // auto cpts = (std::vector<uint32_t>*) llama_cpts_from_utf8(&utf8);
+            // const bool in_uscripts = llama_cpts_in_uscripts(llama_cpts_from_utf8(&utf8));
+            // for (const auto & cpt : *cpts) {
+            //     llama_cpt_in_uscripts();
+            // }
+            // const bool in_uscripts = llama_utf8_in_uscripts(&utf8, &params_base.uscripts);
+        }
+        // llama_apply_uscripts_bias(&uscripts_bias);
+    }
+
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
 
     for (int i = 0; i < params_base.n_parallel; i++) {
@@ -258,6 +288,8 @@ void server_context::init() {
                 }
             }
         }
+
+        slot.ctx_sampling->uscripts_bias = uscripts_bias;
 
         slot.reset();
 

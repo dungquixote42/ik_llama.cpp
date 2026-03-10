@@ -45,12 +45,21 @@ def get_script_data():
             merged_data.append(sd)
 
     script_data = {}
+    # script_heads = {}
+    # script_tails = {}
     for md in merged_data:
+        # if md[0] not in script_heads:
+        #     script_heads[md[0]] = []
+        # script_heads[md[0]].append(md[1])
+        # if md[0] not in script_tails:
+        #     script_heads[md[0]] = []
+        # script_tails[md[0]].append(md[2])
         if md[0] in script_data:
             script_data[md[0]].append([md[1], md[2]])
         else:
             script_data[md[0]] = [[md[1], md[2]]]
 
+    # return script_heads, script_tails
     return script_data
 
 
@@ -65,6 +74,9 @@ def out(line=""):
     print(line, end='\n')  # noqa
 
 
+# heads, tails = get_script_data()
+data = get_script_data()
+
 out("""\
 // generated with scripts/gen-unicode-scripts-data.py
 
@@ -76,13 +88,11 @@ out("""\
 #include <vector>
 """)
 
-out("constexpr std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts = {")
+out("constexpr std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts_ranges = {")
 
-script_data = get_script_data()
 for script in script_data:
     out("{ \"%s\", { {" % script)
     for data in script_data[script]:
-        # out("    { 0x%06X, 0x%06X }," % (data[0], data[1]))
         out("    0x%06X," % data[0])
     out("}, {")
     for data in script_data[script]:

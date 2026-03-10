@@ -136,6 +136,8 @@ struct common_sampler {
     std::mt19937 rng;
 
     int32_t n_rewind;   // number of tokens to rewind
+
+    std::vector<float> uscripts_bias;
 };
 
 

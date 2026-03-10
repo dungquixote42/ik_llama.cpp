@@ -19,6 +19,35 @@
 #include <utility>
 #include <vector>
 
+
+bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
+    const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
+    // for (const auto& cpt: cpts) {
+    //     bool found = false;
+    //     for (const auto& uscript: uscripts) {
+    //         const auto& ranges = unicode_scripts_ranges[uscript];
+    //         auto it = std::lower_bound(ranges.first.begin(), ranges.first.end(), cpt);
+    //         if (it < ranges.first.end()) {
+    //             found = cpt <= ranges.second[std::distance(ranges.first.begin(), it)];
+    //         }
+    //     }
+    //     if (!found) { return false; }
+    // }
+    bool found = true;
+    for (size_t i = 0; found && (i < cpts.size()); ++i) {
+        const uint32_t cpt = cpts[i];
+        found = false;
+        for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
+            const auto& ranges = unicode_scripts_ranges[uscripts[j]];
+            auto it = std::lower_bound(ranges.first.begin(), ranges.first.end(), cpt);
+            if (it < ranges.first.end()) {
+                found = cpt <= ranges.second[std::distance(ranges.first.begin(), it)];
+            }
+        }
+    }
+    return found;
+}
+
 size_t unicode_len_utf8(char src) {
     const size_t lookup[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 3, 4 };
     uint8_t highbits = static_cast<uint8_t>(src) >> 4;

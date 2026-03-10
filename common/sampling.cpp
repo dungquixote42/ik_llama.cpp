@@ -506,6 +506,10 @@ static llama_token_data_array llama_sampling_prepare_impl(
         logits[it->first] += it->second;
     }
 
+    if (n_vocab == ctx_sampling->uscripts_bias.size()) {
+        llama_apply_bias(n_vocab, logits, ctx_sampling->uscripts_bias.data());
+    }
+    
     if (ctx_cfg) {
         float * logits_guidance = llama_get_logits_ith(ctx_cfg, idx);
         llama_sample_apply_guidance(ctx_main, logits, logits_guidance, params.cfg_scale);
