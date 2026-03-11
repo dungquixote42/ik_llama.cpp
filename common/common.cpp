@@ -1615,7 +1615,12 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
     }
     if (arg == "--unicode-scripts") {
         CHECK_ARG
-        params.uscripts = string_split(argv[i], ",");
+        std::vector<std::string> uscripts = string_split(argv[i], ",");
+        for (auto& uscript: uscripts) {
+            if (!uscript.empty()) {
+                params.uscripts.push_back(string_lower(uscript));
+            }
+        }
         return true;
     }
     if (arg == "--no-common-script") {
