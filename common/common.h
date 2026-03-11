@@ -283,8 +283,8 @@ struct gpt_params {
     bool can_ban_phrases             = true;  // whether to ban strings
 
     std::vector<std::string> uscripts;
-    bool un_common = false;
-    bool un_latin  = false;
+    bool no_common = false;
+    bool no_latin  = false;
 
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;

@@ -8481,7 +8481,9 @@ void llama_set_draft_input_hidden_state(struct llama_context * ctx, const float 
 }
 
 bool llama_utf8_in_uscripts(void* utf8, void* uscripts) {
-    return unicode_utf8_in_uscripts(*(std::string*)utf8, *(std::vector<std::string>*)uscripts);
+    std::string _utf8 = *(std::string*)utf8;
+    std::vector<std::string> _uscripts = *(std::vector<std::string>*)uscripts;
+    return unicode_utf8_in_uscripts(_utf8, _uscripts);
 }
 
 void llama_apply_bias(const int n_vocab, float* logits, float* bias) {

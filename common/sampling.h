@@ -137,7 +137,7 @@ struct common_sampler {
 
     int32_t n_rewind;   // number of tokens to rewind
 
-    std::vector<float> uscripts_bias;
+    std::vector<float> uscript_bias;    // unicode script bias
 };
 
 

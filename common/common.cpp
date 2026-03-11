@@ -1618,12 +1618,12 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.uscripts = string_split(argv[i], ",");
         return true;
     }
-    if (arg == "--unicode-no-common") {
-        params.un_common = true;
+    if (arg == "--no-common-script") {
+        params.no_common = true;
         return true;
     }
-    if (arg == "--unicode-no-latin") {
-        params.un_latin = true;
+    if (arg == "--no-latin-script") {
+        params.no_latin = true;
         return true;
     }
     if (arg == "-ld" || arg == "--logdir") {

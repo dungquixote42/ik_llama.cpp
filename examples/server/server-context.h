@@ -257,7 +257,7 @@ struct server_context {
     int32_t cache_ram_n_min = 0;
     float cache_ram_similarity = 0.5f;
 
-    std::vector<float> uscripts_bias;
+    std::vector<float> uscript_bias;
 
     ~server_context();
 

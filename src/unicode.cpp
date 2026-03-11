@@ -22,18 +22,20 @@
 
 bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
     const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
+
+    // all codepoints
     bool found = true;
     for (size_t i = 0; found && (i < cpts.size()); ++i) {
         const uint32_t cpt = cpts[i];
+
+        // any script
         found = false;
         for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
             auto it_us = unicode_scripts.find(uscripts[j]);
             if (it_us != unicode_scripts.end()) {
                 const auto& heads = it_us->second.first;
-                auto it_heads = std::lower_bound(heads.begin(), heads.end(), cpt);
-                if (it_heads < heads.end()) {
-                    found = cpt <= it_us->second.second[std::distance(heads.begin(), it_heads)];
-                }
+                auto idx = std::distance(heads.begin(), std::upper_bound(heads.begin(), heads.end(), cpt));
+                found = (idx > 0) && (heads[idx-1] <= cpt) && (cpt <= it_us->second.second[idx-1]);
             }
         }
     }
