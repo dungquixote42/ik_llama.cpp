@@ -60,7 +60,7 @@ add_library(llama
             unicode.h
             unicode.cpp
             unicode-data.cpp
-            unicode-script-data.cpp
+            unicode-scripts.cpp
             )
 
 target_include_directories(llama PUBLIC . ../include)

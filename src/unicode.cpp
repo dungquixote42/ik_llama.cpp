@@ -27,10 +27,13 @@ bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::st
         const uint32_t cpt = cpts[i];
         found = false;
         for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
-            const auto& ranges = unicode_scripts_ranges[uscripts[j]];
-            auto it = std::lower_bound(ranges.first.begin(), ranges.first.end(), cpt);
-            if (it < ranges.first.end()) {
-                found = cpt <= ranges.second[std::distance(ranges.first.begin(), it)];
+            auto it_us = unicode_scripts.find(uscripts[j]);
+            if (it_us != unicode_scripts.end()) {
+                const auto& heads = it_us->second.first;
+                auto it_heads = std::lower_bound(heads.begin(), heads.end(), cpt);
+                if (it_heads < heads.end()) {
+                    found = cpt <= it_us->second.second[std::distance(heads.begin(), it_heads)];
+                }
             }
         }
     }

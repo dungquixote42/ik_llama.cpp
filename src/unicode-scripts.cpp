@@ -1,4 +1,4 @@
-// generated with scripts/gen-unicode-scripts-data.py
+// generated with scripts/gen-unicode-scripts.py
 
 #include "unicode-data.h"
 
@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts_ranges = {
+const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts = {
 { "common", { {
     0x000000,
     0x00005B,

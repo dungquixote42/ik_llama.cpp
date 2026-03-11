@@ -1119,7 +1119,7 @@ src/unicode.o: \
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 src/unicode-data.o: \
-	src/unicode-script-data.cpp \
+	src/unicode-scripts.cpp \
 	src/unicode-data.cpp \
 	src/unicode-data.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@

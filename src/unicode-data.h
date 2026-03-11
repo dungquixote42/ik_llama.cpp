@@ -20,4 +20,4 @@ extern const std::unordered_map<uint32_t, uint32_t> unicode_map_lowercase;
 extern const std::unordered_map<uint32_t, uint32_t> unicode_map_uppercase;
 extern const std::vector<range_nfd> unicode_ranges_nfd;
 
-extern const std::unordered_map<std::string, const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts_ranges;
+extern const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts;
