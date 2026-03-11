@@ -1304,7 +1304,7 @@ llm_expert_gating_func_type   gating_op,
 
         if (up_shexp && gate_shexp && down_shexp) {
             if (split_up_shexp) {
-                std::vector<ggml_tensor *> results; results.reserve(split_up_shexp->n_device);
+                std::vector<ggml_tensor *> results(split_up_shexp->n_device, nullptr);
                 GGML_ASSERT(!split_up_b_shexp   || split_up_b_shexp->n_device   == split_up_shexp->n_device);
                 GGML_ASSERT(!split_gate_b_shexp || split_gate_b_shexp->n_device == split_up_shexp->n_device);
                 GGML_ASSERT(!split_down_b_shexp || split_down_b_shexp->n_device == split_up_shexp->n_device);
@@ -1335,8 +1335,7 @@ llm_expert_gating_func_type   gating_op,
                             split_up_shexp->splits[id],   split_up_b_shexp   ? split_up_b_shexp->splits[id]   : nullptr, nullptr,
                             split_gate_shexp->splits[id], split_gate_b_shexp ? split_gate_b_shexp->splits[id] : nullptr, nullptr,
                             split_down_shexp->splits[id], !down_bias_added && split_down_b_shexp ? split_down_b_shexp->splits[id] : nullptr, nullptr,
-                            nullptr, type_op_shexp, LLM_FFN_PAR, cb, il, graph, false, false,
-                            id == id_add_routed ? routed_out : nullptr);
+                            nullptr, type_op_shexp, LLM_FFN_PAR, cb, il, graph, false, false, nullptr);
                     cb(shared_out, "ffn_shexp_out", il_cb);
                     if (shexp_gate) {
                         auto split_shexp_gate = (ggml_split_tensor_t *)shexp_gate->extra;
@@ -1350,11 +1349,16 @@ llm_expert_gating_func_type   gating_op,
                         }
                         cb(shared_out, "ffn_shexp_gated", il_cb);
                     }
+                    if (id == id_add_routed) {
+                        shared_out = ggml_add(ctx, shared_out, routed_out);
+                        cb(shared_out, "ffn_shared_routed_added", il);
+                    }
                     if (shared_out->ne[1] > 32 && lctx.cparams.reduce_type != GGML_TYPE_F32) {
                         shared_out = ggml_cast(ctx, shared_out, lctx.cparams.reduce_type);
                     }
+                    ggml_build_forward_expand(graph, shared_out);
                     down_bias_added = true;
-                    results.push_back(shared_out);
+                    results[id] = shared_out;
                 }
                 GGML_ASSERT(!results.empty());
                 cur = ggml_reduce(ctx, results.data(), split_up_shexp->n_device, GGML_OP_ADD);
@@ -4433,7 +4437,6 @@ ggml_cgraph * llm_build_context::build_qwen3next() {
     ggml_tensor * cur = nullptr;
 
     for (int il = 0; il < n_layer; ++il) {
-        ggml_tensor * inpSA = inpL;
 
         GGML_ASSERT(model.layers[il].attn_norm != nullptr);
         GGML_ASSERT(model.layers[il].attn_post_norm != nullptr);
@@ -4451,27 +4454,7 @@ ggml_cgraph * llm_build_context::build_qwen3next() {
 
 
         if (hparams.is_recurrent(il)) {
-            int idx = model.default_layer_device[il];
-            if (inpL->op == GGML_OP_REDUCE) {
-                if (kv_self.s_l[il]) {
-                    // This shouldn't be necessary, but just in case.
-                    int idx_s_l = ggml_backend_sched_get_backend_idx(lctx.sched, kv_self.s_l[il]->buffer);
-                    if (idx_s_l >= 0) idx = idx_s_l;
-                }
-                if (inpL->src[idx]) {
-                    inpL->view_src = inpL->src[idx];
-                }
-            }
-            auto norm = model.layers[il].attn_norm->extra ? ((ggml_split_tensor_t *)model.layers[il].attn_norm->extra)->splits[idx] : model.layers[il].attn_norm;
-            cur = llm_build_norm(ctx0, inpL, hparams, norm, nullptr, LLM_NORM_RMS, cb, il);
-            cb(cur, "attn_norm", il);
-            cur = delta.build_layer_attn_linear(ctx0, gf, cur, il, cb);
-            if (il == n_layer - 1 && inp_out_ids) {
-                cur   = ggml_get_rows(ctx0, cur, inp_out_ids);
-                inpSA = ggml_get_rows(ctx0, inpSA, inp_out_ids);
-            }
-            cur = ggml_add(ctx0, cur, inpSA);
-            cb(cur, "attn_residual", il);
+            cur = delta.build_layer_attn_linear(ctx0, gf, inpL, il == n_layer - 1 ? inp_out_ids : nullptr, il, cb);
         } else {
             cur = build_std_attention(gf, model.layers[il].attn_norm, inpL, inp_pos, il == n_layer - 1 ? inp_out_ids : nullptr, nullptr,
                     KQ_mask, nullptr, nullptr, KQ_scale, 0.0f, 0, il, true, false, true, false, false);
@@ -4541,28 +4524,7 @@ ggml_cgraph * llm_build_context::build_qwen35moe() {
     for (int il = 0; il < n_layer; ++il) {
 
         if (hparams.is_recurrent(il)) {
-            ggml_tensor * inpSA = inpL;
-            int idx = model.default_layer_device[il];
-            if (inpL->op == GGML_OP_REDUCE) {
-                if (kv_self.s_l[il]) {
-                    // This shouldn't be necessary, but just in case.
-                    int idx_s_l = ggml_backend_sched_get_backend_idx(lctx.sched, kv_self.s_l[il]->buffer);
-                    if (idx_s_l >= 0) idx = idx_s_l;
-                }
-                if (inpL->src[idx]) {
-                    inpL->view_src = inpL->src[idx];
-                }
-            }
-            auto norm = model.layers[il].attn_norm->extra ? ((ggml_split_tensor_t *)model.layers[il].attn_norm->extra)->splits[idx] : model.layers[il].attn_norm;
-            cur = llm_build_norm(ctx0, inpL, hparams, norm, nullptr, LLM_NORM_RMS, cb, il);
-            cb(cur, "attn_norm", il);
-            cur = delta.build_layer_attn_linear(ctx0, gf, cur, il, cb);
-            if (il == n_layer - 1 && inp_out_ids) {
-                cur   = ggml_get_rows(ctx0, cur, inp_out_ids);
-                inpSA = ggml_get_rows(ctx0, inpSA, inp_out_ids);
-            }
-            cur = ggml_add(ctx0, cur, inpSA);
-            cb(cur, "attn_residual", il);
+            cur = delta.build_layer_attn_linear(ctx0, gf, inpL, il == n_layer - 1 ? inp_out_ids : nullptr, il, cb);
         } else {
             cur = build_std_attention(gf, model.layers[il].attn_norm, inpL, inp_pos, il == n_layer - 1 ? inp_out_ids : nullptr, nullptr,
                     KQ_mask, nullptr, nullptr, KQ_scale, 0.0f, 0, il, true, false, true, false, true);
@@ -4621,28 +4583,7 @@ ggml_cgraph * llm_build_context::build_qwen35() {
     for (int il = 0; il < n_layer; ++il) {
 
         if (hparams.is_recurrent(il)) {
-            ggml_tensor * inpSA = inpL;
-            int idx = model.default_layer_device[il];
-            if (inpL->op == GGML_OP_REDUCE) {
-                if (kv_self.s_l[il]) {
-                    // This shouldn't be necessary, but just in case.
-                    int idx_s_l = ggml_backend_sched_get_backend_idx(lctx.sched, kv_self.s_l[il]->buffer);
-                    if (idx_s_l >= 0) idx = idx_s_l;
-                }
-                if (inpL->src[idx]) {
-                    inpL->view_src = inpL->src[idx];
-                }
-            }
-            auto norm = model.layers[il].attn_norm->extra ? ((ggml_split_tensor_t *)model.layers[il].attn_norm->extra)->splits[idx] : model.layers[il].attn_norm;
-            cur = llm_build_norm(ctx0, inpL, hparams, norm, nullptr, LLM_NORM_RMS, cb, il);
-            cb(cur, "attn_norm", il);
-            cur = delta.build_layer_attn_linear(ctx0, gf, cur, il, cb);
-            if (il == n_layer - 1 && inp_out_ids) {
-                cur   = ggml_get_rows(ctx0, cur, inp_out_ids);
-                inpSA = ggml_get_rows(ctx0, inpSA, inp_out_ids);
-            }
-            cur = ggml_add(ctx0, cur, inpSA);
-            cb(cur, "attn_residual", il);
+            cur = delta.build_layer_attn_linear(ctx0, gf, inpL, il == n_layer - 1 ? inp_out_ids : nullptr, il, cb);
         } else {
             cur = build_std_attention(gf, model.layers[il].attn_norm, inpL, inp_pos, il == n_layer - 1 ? inp_out_ids : nullptr, nullptr,
                     KQ_mask, nullptr, nullptr, KQ_scale, 0.0f, 0, il, true, false, true, false, true);
@@ -7075,7 +7016,7 @@ ggml_cgraph * llm_build_context::build_deepseek2() {
                     if (cparams.attn_max_batch > 0 && kv_f32_size > cparams.attn_max_batch) {
                         n_max_head = 1;
                         for (int niter = 2; niter < n_head; ++niter) {
-                            if (n_head % niter == 0 && kv_f32_size/(n_head/niter) <= cparams.attn_max_batch) {
+                            if (n_head % niter == 0 && kv_f32_size/niter <= cparams.attn_max_batch) {
                                 n_max_head = n_head/niter;
                                 break;
                             }
