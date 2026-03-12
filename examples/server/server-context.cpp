@@ -161,7 +161,7 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
-    // initialize unicode bias
+    // initialize unicode script bias
     auto& uscripts = params_base.uscripts;
     if (uscripts.size() > 0) {
         if (!params_base.no_common && (find(uscripts.begin(), uscripts.end(), "common") == uscripts.end())) {
@@ -1402,8 +1402,8 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
         }
     }
 
+    // copy unicode script bias
     if (slot.ctx_sampling->uscript_bias.size() != uscript_bias.size()) {
-        // copy unicode script bias
         slot.ctx_sampling->uscript_bias = uscript_bias;
     }
 
