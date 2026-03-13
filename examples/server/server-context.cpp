@@ -164,12 +164,6 @@ void server_context::init() {
     // initialize unicode script bias
     auto& uscripts = params_base.uscripts;
     if (uscripts.size() > 0) {
-        if (!params_base.no_common && (find(uscripts.begin(), uscripts.end(), "common") == uscripts.end())) {
-            uscripts.push_back("common");
-        }
-        if (!params_base.no_latin && (find(uscripts.begin(), uscripts.end(), "latin") == uscripts.end())) {
-            uscripts.push_back("latin");
-        }
         const llama_vocab* vocab = llama_model_get_vocab(model);
         const int32_t n_vocab = llama_vocab_n_tokens(vocab);
         uscript_bias.resize(n_vocab);

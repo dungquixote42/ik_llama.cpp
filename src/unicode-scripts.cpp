@@ -8,6 +8,11 @@
 #include <vector>
 
 const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts = {
+{ "ascii", { {
+    0x000000,
+}, {
+    0x00007F,
+} } },
 { "common", { {
     0x000000,
     0x00005B,

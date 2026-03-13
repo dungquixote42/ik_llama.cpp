@@ -81,6 +81,12 @@ out("""\
 
 out("const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts = {")
 
+out("{ \"ascii\", { {")
+out("    0x000000,")
+out("}, {")
+out("    0x00007F,")
+out("} } },")
+
 for script in script_data:
     out("{ \"%s\", { {" % script)
     for data in script_data[script]:

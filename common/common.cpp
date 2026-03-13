@@ -1628,14 +1628,6 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         }
         return true;
     }
-    if (arg == "--no-common-script") {
-        params.no_common = true;
-        return true;
-    }
-    if (arg == "--no-latin-script") {
-        params.no_latin = true;
-        return true;
-    }
     if (arg == "-ld" || arg == "--logdir") {
         CHECK_ARG
         params.logdir = argv[i];
