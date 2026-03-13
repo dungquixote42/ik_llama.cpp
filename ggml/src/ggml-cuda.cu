@@ -978,10 +978,13 @@ GGML_CALL static void ggml_backend_cuda_split_buffer_set_tensor([[maybe_unused]]
         }
     }
     else if (extra->split_dim == 1) {
+        void * extra_ptr;
+        memcpy(&extra_ptr, tensor->op_params, sizeof(extra_ptr));
         if (tensor->ne[2] > 1) {
             auto row_size = ggml_row_size(tensor->type, tensor->ne[0]);
             std::vector<char> host_buffer;
             int ne1 = 0;
+            int extra_ne1 = 0;
             for (int i = 0; i < extra->n_device; ++i) {
                 auto split = extra->splits[i];
                 if (!split) continue;
@@ -990,8 +993,18 @@ GGML_CALL static void ggml_backend_cuda_split_buffer_set_tensor([[maybe_unused]]
                 if (host_buffer.size() < size) host_buffer.resize(size);
                 for (int64_t i02 = 0; i02 < split->ne[2]; ++i02) {
                     auto dst = host_buffer.data() + i02*split->ne[1]*row_size;
-                    auto src = (const char *)data + i02*tensor->nb[2] + ne1*tensor->nb[1];
-                    memcpy(dst, src, split->ne[1]*row_size);
+                    if (extra_ptr) {
+                        auto & ranges = *(const std::vector<std::vector<std::pair<int,int>>> *)extra_ptr;
+                        for (auto & p : ranges[i]) {
+                            auto this_src = (const char *)data + i02*tensor->nb[2] + p.first*tensor->nb[1];
+                            auto this_size = p.second*tensor->nb[1];
+                            memcpy(dst, this_src, this_size);
+                            dst += this_size;
+                        }
+                    } else {
+                        auto src = (const char *)data + i02*tensor->nb[2] + ne1*tensor->nb[1];
+                        memcpy(dst, src, split->ne[1]*row_size);
+                    }
                 }
                 CUDA_CHECK(cudaMemcpyAsync(split->data, host_buffer.data(), size, cudaMemcpyHostToDevice, cudaStreamPerThread));
                 ne1 += split->ne[1];
@@ -999,8 +1012,6 @@ GGML_CALL static void ggml_backend_cuda_split_buffer_set_tensor([[maybe_unused]]
         } else {
             int n_interleave = 1;
             if (auto it = k_map.find(tensor->type); it != k_map.end()) n_interleave = it->second;
-            void * extra_ptr;
-            memcpy(&extra_ptr, tensor->op_params, sizeof(extra_ptr));
             if (extra_ptr) {
                 auto & ranges = *(const std::vector<std::vector<std::pair<int,int>>> *)extra_ptr;
                 GGML_ASSERT(extra->n_device == int(ranges.size()));
@@ -2752,7 +2763,7 @@ static int ggml_cuda_moe_up_gate_unary(ggml_backend_cuda_context & ctx, ggml_ten
             if (src0_2) {
                 ggml_cuda_op_fused_mul_mat_vec_q_id(ctx, src0_1, &local_src1, ids, &local_dst,
                         dst->src[4], dst->src[5],
-                        (const char *)src0_1->data, src0_2 ? (const char *)src0_2->data : nullptr,
+                        (const char *)src0_1->data, (const char *)src0_2->data,
                         (const float *)src1->data, src1_quantized.get(),
                         (float *)local_dst.data, 0, src0_1->ne[1], 1, src1_padded_col_size, unary_op, limit, stream);
             } else {
@@ -2763,7 +2774,7 @@ static int ggml_cuda_moe_up_gate_unary(ggml_backend_cuda_context & ctx, ggml_ten
                 if (!dst->src[4]) {
                     ggml_cuda_op_fused_mul_mat_vec_q_id(ctx, &local_src0_1, &local_src1, ids, &local_dst,
                             nullptr, nullptr,
-                            (const char *)local_src0_1.data, (const char *)local_src0_2.data,
+                            (const char *)local_src0_2.data, (const char *)local_src0_1.data,
                             (const float *)src1->data, src1_quantized.get(),
                             (float *)local_dst.data, 0, local_src0_1.ne[1], 1, src1_padded_col_size, unary_op, limit, stream);
                 } else {
@@ -2773,8 +2784,8 @@ static int ggml_cuda_moe_up_gate_unary(ggml_backend_cuda_context & ctx, ggml_ten
                     auto local_bias_2 = local_bias_1;
                     local_bias_2.data = (char *)local_bias_1.data + local_bias_1.ne[0]*local_bias_1.nb[0];
                     ggml_cuda_op_fused_mul_mat_vec_q_id(ctx, &local_src0_1, &local_src1, ids, &local_dst,
-                            &local_bias_1, &local_bias_2,
-                            (const char *)local_src0_1.data, (const char *)local_src0_2.data,
+                            &local_bias_2, &local_bias_1,
+                            (const char *)local_src0_2.data, (const char *)local_src0_1.data,
                             (const float *)src1->data, src1_quantized.get(),
                             (float *)local_dst.data, 0, local_src0_1.ne[1], 1, src1_padded_col_size, unary_op, limit, stream);
                 }
@@ -2922,7 +2933,7 @@ static int ggml_cuda_moe_up_gate_unary(ggml_backend_cuda_context & ctx, ggml_ten
 
             auto unary_op = (ggml_unary_op)dst->op_params[0];
             if (unary_op == GGML_UNARY_OP_SWIGLU_OAI) {
-                ggml_swiglu_oai_cuda_f32((const float *)dst_up_gate_contiguous.get() + dst->ne[0], (const float *)dst_up_gate_contiguous.get(),
+                ggml_swiglu_oai_cuda_f32((const float *)dst_up_gate_contiguous.get(), (const float *)dst_up_gate_contiguous.get() + dst->ne[0],
                         (float *)dst->data, ggml_nelements(dst), dst->ne[0], src0_1->ne[1], src0_1->ne[1],
                         1.702f, 7.0f, stream);
             } else {
@@ -3121,7 +3132,7 @@ static int ggml_cuda_moe_up_gate_unary(ggml_backend_cuda_context & ctx, ggml_ten
             }
         } else {
             if (unary_op == GGML_UNARY_OP_SWIGLU_OAI) {
-                ggml_swiglu_oai_cuda_f32((const float *)dst_up_contiguous.get() + dst->ne[0], (const float *)dst_up_contiguous.get(),
+                ggml_swiglu_oai_cuda_f32((const float *)dst_up_contiguous.get(), (const float *)dst_up_contiguous.get() + dst->ne[0],
                         (float *)dst_gate_contiguous.get(), ggml_nelements(&dst_row)/2, dst->ne[0], src0_1->ne[1], src0_1->ne[1],
                         1.702f, 7.0f, stream);
             } else {
