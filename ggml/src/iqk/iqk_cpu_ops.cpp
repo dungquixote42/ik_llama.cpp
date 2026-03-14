@@ -624,36 +624,3 @@ bool iqk_ssm_conv4(int nr, int nc, int nt,
 #endif
     }
 
-void iqk_vvecadd_f32(int n, float * logits, float * bias) {
-#ifdef __AVX512F__
-    for (int j = 0; j < n/16; ++j) {
-        auto x = _mm512_loadu_ps(logits);
-        auto y = _mm512_loadu_ps(bias);
-        auto z = _mm512_add_ps(x, y);
-        _mm512_storeu_ps(logits, z);
-        logits += 16;
-        bias += 16;
-    }
-    for (int j = 0; j < n%16; ++j) {
-        logits[j] += bias[j];
-    }
-#else
-#ifdef __AVX2__
-    for (int j = 0; j < n/8; ++j) {
-        auto x = _mm256_loadu_ps(logits);
-        auto y = _mm256_loadu_ps(bias);
-        auto z = _mm256_add_ps(x, y);
-        _mm256_storeu_ps(logits, z);
-        logits += 8;
-        bias += 8;
-    }
-    for (int j = 0; j < n%8; ++j) {
-        logits[j] += bias[j];
-    }
-#else
-    for (int j = 0; j < n; ++j) {
-        logits[j] += bias[j];
-    }
-#endif
-#endif
-}

@@ -1526,6 +1526,4 @@ llama_token llama_sample_token_with_rng(struct llama_context * ctx, llama_token_
 
 bool llama_utf8_in_scripts(void* utf8, void* scripts);
 
-void llama_apply_bias(const int n_vocab, float* logits, float* bias);
-
 #endif // LLAMA_H

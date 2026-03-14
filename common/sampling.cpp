@@ -505,7 +505,7 @@ static llama_token_data_array llama_sampling_prepare_impl(
     for (auto it = params.logit_bias.begin(); it != params.logit_bias.end(); it++) {
         logits[it->first] += it->second;
     }
-    
+
     if (ctx_cfg) {
         float * logits_guidance = llama_get_logits_ith(ctx_cfg, idx);
         llama_sample_apply_guidance(ctx_main, logits, logits_guidance, params.cfg_scale);

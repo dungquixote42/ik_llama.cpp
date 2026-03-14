@@ -37,8 +37,6 @@ bool iqk_ssm_conv4(int nr, int nc, int nt,
         const float * x0, const float * s0, const float * c,
         float * dst, int ith, int nth);
 
-void iqk_vvecadd_f32(int n, float * logits, float * bias);
-
 #ifdef __cplusplus
 }
 #endif

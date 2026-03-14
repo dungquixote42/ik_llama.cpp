@@ -25,10 +25,6 @@ static void llama_log_softmax(float * array, size_t size) {
     }
 }
 
-void llama_sample_apply_bias(const int n_vocab, float* logits, float* bias) {
-    iqk_vvecadd_f32(n_vocab, logits, bias);
-}
-
 void llama_set_rng_seed_impl(struct llama_sampling * smpl, uint32_t seed) {
     if (seed == LLAMA_DEFAULT_SEED) {
         seed = time(NULL);

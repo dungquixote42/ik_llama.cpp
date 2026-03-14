@@ -8569,7 +8569,3 @@ bool llama_utf8_in_scripts(void* utf8, void* scripts) {
     std::vector<std::string> _scripts = *(std::vector<std::string>*)scripts;
     return unicode_utf8_in_scripts(_utf8, _scripts);
 }
-
-void llama_apply_bias(const int n_vocab, float* logits, float* bias) {
-    llama_sample_apply_bias(n_vocab, logits, bias);
-}
