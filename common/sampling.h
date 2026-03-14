@@ -135,8 +135,6 @@ struct common_sampler {
 
     std::mt19937 rng;
 
-    int32_t n_rewind;   // number of tokens to rewind
-
     std::vector<float> logit_bias;  // logit bias for all tokens
 };
 
@@ -154,7 +152,7 @@ void common_sampler_reset(common_sampler * ctx);
 
 // Review stateful samplers
 // - rewind internal states (maybe)
-void common_sampler_review(common_sampler * ctx);
+void common_sampler_review(common_sampler * ctx, const size_t n_unsent, const bool rewind_status);
 
 // Set the sampler seed
 void llama_sampling_set_rng_seed(struct common_sampler * ctx, uint32_t seed);
