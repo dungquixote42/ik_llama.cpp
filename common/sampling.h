@@ -135,7 +135,7 @@ struct common_sampler {
 
     std::mt19937 rng;
 
-    std::vector<float> logit_bias;  // logit bias for all tokens
+    std::vector<float> logit_bias;  // logit bias for all tokens or empty
 };
 
 

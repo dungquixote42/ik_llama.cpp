@@ -156,28 +156,35 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
-    // initialize whitelist and bias
     if (params_base.white_script.size() > 0) {
+        SRV_INF("%s\n", "processing whitelist");
+
         std::vector<std::string> scripts;
         for (auto& ws: string_split(params_base.white_script, ",")) {
             scripts.push_back(ws);
         }
+        if (!params_base.white_unsafe) {
+            if (find(scripts.begin(), scripts.end(), "ascii") == scripts.end()) {
+                scripts.push_back("ascii");
+            }
+            if (find(scripts.begin(), scripts.end(), "common") == scripts.end()) {
+                scripts.push_back("common");
+            }
+        }
+
         const llama_vocab* vocab = llama_model_get_vocab(model);
         const int32_t n_vocab = llama_vocab_n_tokens(vocab);
         logit_bias.resize(n_vocab);
         for (int32_t id = 0; id < n_vocab; ++id) {
             std::string utf8 = common_detokenize(vocab, { id }, false);
             if ((utf8.size() > 0) && !llama_utf8_in_scripts(&utf8, &scripts)) {
-                // not whitelist == blacklist
+                // at least one character in utf8 does not match any script in whitelist
                 logit_bias[id] = -999;
             }
         }
         for (auto& wt: params_base.white_tokens) {
-            printf("%s\n", wt.data());
-            std::vector<llama_token> ids = common_tokenize(model, wt, false, true);
+            std::vector<llama_token> ids = common_tokenize(model, wt, false, false);
             for (auto& id: ids) {
-                printf("%d\n", id);
-                // rescue from blacklist
                 logit_bias[id] = 0;
             }
         }

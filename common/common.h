@@ -282,8 +282,9 @@ struct gpt_params {
     size_t n_buffer 				 =  0; // number of token buffers for string ban
     bool can_ban_phrases             = true;  // whether to ban strings
 
-    std::string              white_script;  // whitelisted scripts
-    std::vector<std::string> white_tokens;  // whitelisted tokens
+    std::string white_script              = "";     // comma separated scripts to whitelist
+    std::vector<std::string> white_tokens = {};     // tokens to whitelist
+    bool white_unsafe                     = false;  // false: whitelist ascii and common
 
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;

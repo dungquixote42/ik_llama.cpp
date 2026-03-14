@@ -1623,9 +1623,13 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.white_script = argv[i];
         return true;
     }
-    if (arg == "--whitelist-token") {
+    if (arg == "--whitelist-tokens") {
         CHECK_ARG
         params.white_tokens.push_back(argv[i]);
+        return true;
+    }
+    if (arg == "--whitelist-unsafe") {
+        params.white_unsafe = true;
         return true;
     }
     if (arg == "-ld" || arg == "--logdir") {
@@ -2357,9 +2361,13 @@ void gpt_params_print_usage(int /*argc*/, char ** argv, const gpt_params & param
     options.push_back({ "*",           "       --top-n-sigma t",        "top-n-sigma parmeter (default: %.1f, 0.0 = disabled)", (double)sparams.top_n_sigma});
     options.push_back({ "*",           "       --adaptive-target",      "adaptive-p sampling: (default: %.2f, <0.0 = disabled)", (double)sparams.adaptive_target});
     options.push_back({ "*",           "       --adaptive-decay",       "adaptive-p sampling: (default: %.2f)", (double)sparams.adaptive_decay});
+    options.push_back({ "*",           "       --adaptive-updt-w-cur",  "adaptive-p sampling: (default: %s)", sparams.adaptive_updt_w_cur ? "true" : "false"});
     options.push_back({ "*",           "       --banned-string-file",   "file path of the list of banned strings on each line" });
     options.push_back({ "*",           "       --banned-n",             "number of tokens banned in the phrase during rewind. -1 means all tokens: (default: %d)",params.banned_n });
-    options.push_back({ "*",           "       --adaptive-updt-w-cur",  "adaptive-p sampling: (default: %s)", sparams.adaptive_updt_w_cur ? "true" : "false"});
+    options.push_back({ "*",           "       --whitelist-script",     "comma separated scripts to whitelist (default: \"%s\", \"\" = disabled)", params.white_script.c_str() });
+    options.push_back({ "*",           "       --whitelist-tokens",     "tokens to delist from blacklist. concatenated without delimiters. may be specified multiple times (default count: %zu)", params.white_tokens.size() });
+    options.push_back({ "*",           "       --whitelist-unsafe",     "if specified, \"ascii\" and \"common\" are not automatically added to whitelist (default: %s)", params.white_unsafe ? "true" : "false" });
+
     options.push_back({ "*",           "       -l TOKEN_ID(+/-)BIAS",   "modifies the likelihood of token appearing in the completion,\n"
                                                                         "i.e. `--logit-bias 15043+1` to increase likelihood of token ' Hello',\n"
                                                                         "or `--logit-bias 15043-1` to decrease likelihood of token ' Hello'" });
