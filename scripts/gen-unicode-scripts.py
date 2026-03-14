@@ -1,72 +1,65 @@
-import requests
 
+from collections import defaultdict
+
+import requests
 
 MAX_CODEPOINTS = 0x110000
 
-SCRIPTS_DATA_URL = "https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt"
+SCRIPT_DATA_URL = "https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt"
 
 
-def get_script_data():
-    res = requests.get(SCRIPTS_DATA_URL)
-    res.raise_for_status()
-    data = res.content.decode()
-    
-    script_data = []
-    
-    for line in data.splitlines():
-        line = line.split()
-        if len(line) <= 1 or line[0] == "#":
-            continue
-        assert line[1] == ";"
-        assert line[3] == "#"
+res = requests.get(SCRIPT_DATA_URL)
+res.raise_for_status()
+data = res.content.decode()
+script_cptL_cptU = []
 
-        cpt = line[0].split("..")
-        if len(cpt) == 1:
-            cpt += cpt
-        cpt_lower, cpt_upper = cpt
+for line in data.splitlines():
+    line = line.split()
+    if len(line) <= 1 or line[0] == "#":
+        continue
+    assert line[1] == ";"
+    assert line[3] == "#"
 
-        cpt_lower = int(cpt_lower, 16)
-        assert cpt_lower < MAX_CODEPOINTS
+    cpt = line[0].split("..")
+    if len(cpt) == 1:
+        cpt += cpt
+    cpt_lower, cpt_upper = cpt
 
-        cpt_upper = int(cpt_upper, 16)
-        assert cpt_upper < MAX_CODEPOINTS
+    cpt_lower = int(cpt_lower, 16)
+    assert cpt_lower < MAX_CODEPOINTS
 
-        script = line[2].lower()
+    cpt_upper = int(cpt_upper, 16)
+    assert cpt_upper < MAX_CODEPOINTS
 
-        script_data.append([script, cpt_lower, cpt_upper])
+    script = line[2].lower()
 
-    script_data.sort(key=lambda x: x[1])
+    script_cptL_cptU.append([script, cpt_lower, cpt_upper])
 
-    merged_data = [script_data[0]]
-    for sd in script_data[1:]:
-        if merged_data[-1][0] == sd[0] and merged_data[-1][2] + 1 == sd[1]:
-            merged_data[-1][2] = sd[2]
-        else:
-            merged_data.append(sd)
+script_cptL_cptU.sort(key=lambda x: x[1])
 
-    script_data = {}
-    for md in merged_data:
-        if md[0] in script_data:
-            script_data[md[0]].append([md[1], md[2]])
-        else:
-            script_data[md[0]] = [[md[1], md[2]]]
+# merge neighboring codepoints that belong to same script
+im = 0  # merge index
+for script, cpt_lower, cpt_upper in script_cptL_cptU[1:]:
+    if (script_cptL_cptU[im][0] == script) and (script_cptL_cptU[im][2] + 1 == cpt_lower):
+        script_cptL_cptU[im][2] = cpt_upper
+    else:
+        im += 1
+        script_cptL_cptU[im] = [script, cpt_lower, cpt_upper]
+del script_cptL_cptU[im + 1:]
 
-    return script_data
-
-
-# def cpt_to_base16(cpt):
-#     return int(chr(cpt).encode("utf-8").hex(), 16)
+# group codepoint ranges by scripts
+script_cptLUs = defaultdict(list)
+for script, cpt_lower, cpt_upper in script_cptL_cptU:
+    script_cptLUs[script].append([cpt_lower, cpt_upper])
+del script_cptL_cptU
 
 
 # Generate 'unicode-script-data.cpp':
-#   python ./scripts//gen-unicode-script-data.py > unicode-script-data.cpp
+#   python ik_llama.cpp/scripts/gen-unicode-scripts.py > ik_llama.cpp/src/unicode-scripts.cpp
 
 def out(line=""):
     print(line, end='\n')  # noqa
 
-
-# heads, tails = get_script_data()
-script_data = get_script_data()
 
 out("""\
 // generated with scripts/gen-unicode-scripts.py
@@ -87,13 +80,13 @@ out("}, {")
 out("    0x00007F,")
 out("} } },")
 
-for script in script_data:
+for script in script_cptLUs:
     out("{ \"%s\", { {" % script)
-    for data in script_data[script]:
-        out("    0x%06X," % data[0])
+    for cpt_lower, _ in script_cptLUs[script]:
+        out("    0x%06X," % cpt_lower)
     out("}, {")
-    for data in script_data[script]:
-        out("    0x%06X," % data[1])
+    for _, cpt_upper in script_cptLUs[script]:
+        out("    0x%06X," % cpt_upper)
     out("} } },")
 
 out("};")

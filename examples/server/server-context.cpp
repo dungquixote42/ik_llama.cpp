@@ -1398,7 +1398,7 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
         }
     }
 
-    // copy logit bias
+    // apply server-level logit bias
     if (slot.ctx_sampling->logit_bias.size() != logit_bias.size()) {
         slot.ctx_sampling->logit_bias = logit_bias;
     }
