@@ -1618,14 +1618,14 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.banned_n = std::stoi(argv[i]);
         return true;
     }
-    if (arg == "--unicode-scripts") {
+    if (arg == "--whitelist-script") {
         CHECK_ARG
-        std::vector<std::string> uscripts = string_split(argv[i], ",");
-        for (auto& uscript: uscripts) {
-            if (!uscript.empty()) {
-                params.uscripts.push_back(string_lower(uscript));
-            }
-        }
+        params.white_script = argv[i];
+        return true;
+    }
+    if (arg == "--whitelist-token") {
+        CHECK_ARG
+        params.white_tokens.push_back(argv[i]);
         return true;
     }
     if (arg == "-ld" || arg == "--logdir") {

@@ -156,18 +156,29 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
-    // initialize unicode script bias
-    auto& uscripts = params_base.uscripts;
-    if (uscripts.size() > 0) {
+    // initialize whitelist and bias
+    if (params_base.white_script.size() > 0) {
+        std::vector<std::string> scripts;
+        for (auto& ws: string_split(params_base.white_script, ",")) {
+            scripts.push_back(ws);
+        }
         const llama_vocab* vocab = llama_model_get_vocab(model);
         const int32_t n_vocab = llama_vocab_n_tokens(vocab);
-        uscript_bias.resize(n_vocab);
+        logit_bias.resize(n_vocab);
         for (int32_t id = 0; id < n_vocab; ++id) {
             std::string utf8 = common_detokenize(vocab, { id }, false);
-            if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &uscripts)) {
-                uscript_bias[id] = -999.0f;
-            } else {
-                uscript_bias[id] = 0.0f;
+            if ((utf8.size() > 0) && !llama_utf8_in_scripts(&utf8, &scripts)) {
+                // not whitelist == blacklist
+                logit_bias[id] = -999;
+            }
+        }
+        for (auto& wt: params_base.white_tokens) {
+            printf("%s\n", wt.data());
+            std::vector<llama_token> ids = common_tokenize(model, wt, false, true);
+            for (auto& id: ids) {
+                printf("%d\n", id);
+                // rescue from blacklist
+                logit_bias[id] = 0;
             }
         }
     }
@@ -1386,9 +1397,9 @@ bool server_context::launch_slot_with_task(server_slot& slot, server_task& task)
         }
     }
 
-    // copy unicode script bias
-    if (slot.ctx_sampling->uscript_bias.size() != uscript_bias.size()) {
-        slot.ctx_sampling->uscript_bias = uscript_bias;
+    // copy logit bias
+    if (slot.ctx_sampling->logit_bias.size() != logit_bias.size()) {
+        slot.ctx_sampling->logit_bias = logit_bias;
     }
 
     slot.command = SLOT_COMMAND_LOAD_PROMPT;

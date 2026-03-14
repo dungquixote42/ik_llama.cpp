@@ -505,11 +505,6 @@ static llama_token_data_array llama_sampling_prepare_impl(
     for (auto it = params.logit_bias.begin(); it != params.logit_bias.end(); it++) {
         logits[it->first] += it->second;
     }
-
-    // apply unicode script bias
-    if (n_vocab == ctx_sampling->uscript_bias.size()) {
-        llama_apply_bias(n_vocab, logits, ctx_sampling->uscript_bias.data());
-    }
     
     if (ctx_cfg) {
         float * logits_guidance = llama_get_logits_ith(ctx_cfg, idx);
@@ -518,8 +513,14 @@ static llama_token_data_array llama_sampling_prepare_impl(
 
     cur.resize(n_vocab);
 
-    for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-        cur[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
+    if (n_vocab == ctx_sampling->logit_bias.size()) {
+        for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+            cur[token_id] = llama_token_data{token_id, logits[token_id] + ctx_sampling->logit_bias[token_id], 0.0f};
+        }
+    } else {
+        for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+            cur[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
+        }
     }
 
     ctx_sampling->cur_p = { cur.data(), cur.size(), false };

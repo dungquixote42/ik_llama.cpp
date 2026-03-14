@@ -46,7 +46,7 @@ struct unicode_cpt_flags {
     }
 };
 
-bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts);
+bool unicode_utf8_in_scripts(const std::string& utf8, const std::vector<std::string>& scripts);
 
 size_t unicode_len_utf8(char src);
 

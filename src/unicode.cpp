@@ -20,7 +20,7 @@
 #include <vector>
 
 
-bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
+bool unicode_utf8_in_scripts(const std::string& utf8, const std::vector<std::string>& scripts) {
     const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
 
     // all codepoints
@@ -30,12 +30,14 @@ bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::st
 
         // any script
         found = false;
-        for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
-            auto it_us = unicode_scripts.find(uscripts[j]);
+        for (size_t j = 0; !found && (j < scripts.size()); ++j) {
+            auto it_us = unicode_scripts.find(scripts[j]);
             if (it_us != unicode_scripts.end()) {
                 const auto& heads = it_us->second.first;
                 auto idx = std::distance(heads.begin(), std::upper_bound(heads.begin(), heads.end(), cpt));
                 found = (idx > 0) && (heads[idx-1] <= cpt) && (cpt <= it_us->second.second[idx-1]);
+            } else {
+                printf("%s: %s is not in unicode-scripts.cpp\n", __func__, scripts[j].data());
             }
         }
     }
