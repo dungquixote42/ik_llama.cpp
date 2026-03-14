@@ -31,13 +31,13 @@ bool unicode_utf8_in_scripts(const std::string& utf8, const std::vector<std::str
         // any script
         found = false;
         for (size_t j = 0; !found && (j < scripts.size()); ++j) {
-            auto it_us = unicode_scripts.find(scripts[j]);
-            if (it_us != unicode_scripts.end()) {
-                const auto& heads = it_us->second.first;
-                auto idx = std::distance(heads.begin(), std::upper_bound(heads.begin(), heads.end(), cpt));
-                found = (idx > 0) && (heads[idx-1] <= cpt) && (cpt <= it_us->second.second[idx-1]);
+            auto it = unicode_scripts.find(scripts[j]);
+            if (it != unicode_scripts.end()) {
+                const auto& firsts = it->second.first;
+                auto idx = std::distance(firsts.begin(), std::upper_bound(firsts.begin(), firsts.end(), cpt));
+                found = (idx > 0) && (firsts[idx-1] <= cpt) && (cpt <= it->second.second[idx-1]);
             } else {
-                printf("%s: %s is not defined in unicode-scripts.cpp\n", __func__, scripts[j].data());
+                printf("%s: %s is not defined in unicode-scripts.cpp\n", __func__, scripts[j].c_str());
             }
         }
     }
