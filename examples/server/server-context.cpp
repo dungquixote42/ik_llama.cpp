@@ -162,30 +162,60 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
-    auto& uscripts = params_base.uscripts;
-    if (uscripts.size() > 0) {
-        size_t n_found = 0;
-        if (!params_base.un_common && (find(uscripts.begin(), uscripts.end(), "common") == uscripts.end())) {
-            uscripts.push_back("common");
-        }
-        if (!params_base.un_latin && (find(uscripts.begin(), uscripts.end(), "latin") == uscripts.end())) {
-            uscripts.push_back("latin");
-        }
-        for (const auto& uscript: uscripts) {
-            LLAMA_LOG_DEBUG("%s: uscript = %s\n", __func__, uscript.data());
-        }
+    auto white_rules = params_base.white_rules;
+    if (white_rules.size() > 0) {
+        SRV_INF("%s\n", "initializing whitelists");
         const llama_vocab* vocab = llama_model_get_vocab(model);
-        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
+        int32_t n_vocab = llama_vocab_n_tokens(vocab);
+        white_logits.resize(n_vocab);
+        white_bin_logits.resize(n_vocab);
+
+        float max_logit = -INFINITY;
         for (int32_t id = 0; id < n_vocab; ++id) {
             std::string utf8 = common_detokenize(vocab, { id }, false);
-            if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &uscripts)) {
-                uscripts_bias[id] = -999.0f;
-            } else {
-                uscripts_bias[id] = 0.0f;
-                ++n_found;
+            std::vector<std::pair<uint32_t, std::string>> cpts_scripts;
+            llama_fill_from_utf8(&utf8, &cpts_scripts);
+
+            float logit = -999;
+            for (const auto& cpt_script: cpts_scripts) {
+                for (const auto& rule: white_rules) {
+                    const auto& range = std::get<0>(rule);
+                    const auto& script = std::get<1>(rule);
+                    if ((range.first <= cpt_script.first) && (cpt_script.first <= range.second)
+                        && (script == cpt_script.second)) {
+                        logit = std::max(logit, std::get<2>(rule));
+                        break;
+                    }
+                }
+            }
+
+            white_logits[id] = logit;
+            white_bin_logits[id] = logit < 0 ? -999 : 0;
+            max_logit = std::max(max_logit, logit);
+        }
+
+        for (const auto& alltoken: params_base.white_alltokens) {
+            for (const auto id: common_tokenize(model, alltoken, false, true)) {
+                white_logits[id] = max_logit;
+                white_bin_logits[id] = 0;
             }
         }
-        LLAMA_LOG_DEBUG("%s: n_found = %zu, n_vocab = %d\n", __func__, n_found, n_vocab);
+
+        for (const auto& token: params_base.white_tokens) {
+            const auto ids = common_tokenize(model, token, false, true);
+            if (ids.size() == 1) {
+                white_logits[ids[0]] = max_logit;
+                white_bin_logits[ids[0]] = 0;
+            } else {
+                SRV_INF("%s is not a token\n", token.data());
+            }
+        }
+
+        std::string testring = "\"그";
+        auto ids = common_tokenize(model, testring, false, true);
+        for (int i = 0; i < ids.size(); i++) {
+            printf("%c: %f %f\n", testring[i], white_logits[ids[i]], white_bin_logits[ids[i]]);
+        }
     }
 
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
@@ -280,8 +310,6 @@ void server_context::init() {
                 }
             }
         }
-
-        slot.ctx_sampling->uscripts_bias = uscripts_bias;
 
         slot.reset();
 
@@ -3303,6 +3331,8 @@ void server_context::speculative_decoding_accept() {
 
         size_t n_draft = slot.drafted.size();
 
+        slot.ctx_sampling->logit_bias = params_base.white_bin_at >= slot.n_decoded ? &white_logits : &white_bin_logits;
+
         // the accepted tokens from the speculation
         const auto ids = common_sampler_sample_and_accept_n(slot.ctx_sampling, ctx, slot.i_batch_dft, slot.drafted);
         
@@ -3733,6 +3763,9 @@ void server_context::process_batch_tokens(int32_t & n_batch) {
                     slot.ctx_sampling->params.logit_bias[tok] += slot.ban_phrases_bias;
                 }
             }
+
+            // pass whitelist to sampler
+            slot.ctx_sampling->logit_bias = params_base.white_bin_at >= slot.n_decoded ? &white_logits : &white_bin_logits;
 
             completion_token_output result;
             const int tok_idx = slot.i_batch - i;

@@ -1,93 +1,77 @@
-import requests
 
+from collections import defaultdict
+
+import requests
 
 MAX_CODEPOINTS = 0x110000
 
-SCRIPTS_DATA_URL = "https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt"
+SCRIPT_DATA_URL = "https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt"
 
 
-def get_script_data():
-    res = requests.get(SCRIPTS_DATA_URL)
-    res.raise_for_status()
-    data = res.content.decode()
-    
-    script_data = []
-    
-    for line in data.splitlines():
-        line = line.split()
-        if len(line) <= 1 or line[0] == "#":
-            continue
-        assert line[1] == ";"
-        assert line[3] == "#"
+res = requests.get(SCRIPT_DATA_URL)
+res.raise_for_status()
+data = res.content.decode()
 
-        cpt = line[0].split("..")
-        if len(cpt) == 1:
-            cpt += cpt
-        cpt_lower, cpt_upper = cpt
+cptL_cptU_script = []
+for line in data.splitlines():
+    line = line.split()
+    if len(line) <= 1 or line[0] == "#":
+        continue
 
-        cpt_lower = int(cpt_lower, 16)
-        assert cpt_lower < MAX_CODEPOINTS
+    cpt = line[0].split("..")
+    if len(cpt) == 1:
+        cpt += cpt
+    cpt_lower, cpt_upper = cpt
 
-        cpt_upper = int(cpt_upper, 16)
-        assert cpt_upper < MAX_CODEPOINTS
+    cpt_lower = int(cpt_lower, 16)
+    if cpt_lower >= MAX_CODEPOINTS:
+        break
 
-        script = line[2].lower()
+    cpt_upper = int(cpt_upper, 16)
+    if cpt_upper >= MAX_CODEPOINTS:
+        break
 
-        script_data.append([script, cpt_lower, cpt_upper])
+    assert line[1] == ";"
 
-    script_data.sort(key=lambda x: x[1])
+    script = line[2].lower()
 
-    merged_data = [script_data[0]]
-    for sd in script_data[1:]:
-        if merged_data[-1][0] == sd[0] and merged_data[-1][2] + 1 == sd[1]:
-            merged_data[-1][2] = sd[2]
-        else:
-            merged_data.append(sd)
+    assert line[3] == "#"
 
-    script_data = {}
-    for md in merged_data:
-        if md[0] in script_data:
-            script_data[md[0]].append([md[1], md[2]])
-        else:
-            script_data[md[0]] = [[md[1], md[2]]]
+    # categ = line[4]
+    # assert len(categ) == 2
 
-    return script_data
+    cptL_cptU_script.append([cpt_lower, cpt_upper, script])
 
+cptL_cptU_script.sort(key=lambda x: x[0])  # just in case
 
-# def cpt_to_base16(cpt):
-#     return int(chr(cpt).encode("utf-8").hex(), 16)
-
+# merge neighboring codepoints that belong to same script
+im = 0  # merge index
+for cpt_lower, cpt_upper, script in cptL_cptU_script[1:]:
+    if (cptL_cptU_script[im][2] == script) and (cptL_cptU_script[im][1] + 1 == cpt_lower):
+        cptL_cptU_script[im][1] = cpt_upper
+    else:
+        im += 1
+        cptL_cptU_script[im] = [cpt_lower, cpt_upper, script]
+del cptL_cptU_script[im + 1:]
 
 # Generate 'unicode-script-data.cpp':
-#   python ./scripts//gen-unicode-script-data.py > unicode-script-data.cpp
+#   python ik_llama.cpp/scripts/gen-unicode-scripts.py > ik_llama.cpp/src/unicode-scripts.cpp
 
 def out(line=""):
     print(line, end='\n')  # noqa
 
 
-# heads, tails = get_script_data()
-script_data = get_script_data()
-
 out("""\
 // generated with scripts/gen-unicode-scripts.py
 
 #include "unicode-data.h"
-
-#include <cstdint>
-#include <string>
-#include <unordered_map>
-#include <vector>
 """)
 
-out("const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts = {")
-
-for script in script_data:
-    out("{ \"%s\", { {" % script)
-    for data in script_data[script]:
-        out("    0x%06X," % data[0])
-    out("}, {")
-    for data in script_data[script]:
-        out("    0x%06X," % data[1])
-    out("} } },")
-
+out("const std::pair<std::vector<uint32_t>, std::vector<std::string>> unicode_lasts_scripts_pair = { {")
+for _, cpt_upper, _ in cptL_cptU_script:
+    out("        0x%06X," % cpt_upper)
+out("    }, {")
+for _, _, script in cptL_cptU_script:
+    out("        \"%s\"," % script)
+out("    }")
 out("};")

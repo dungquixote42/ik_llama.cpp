@@ -264,7 +264,8 @@ struct server_context {
     int32_t cache_ram_n_min = 0;
     float cache_ram_similarity = 0.5f;
 
-    std::vector<float> uscripts_bias;
+    std::vector<float> white_logits;
+    std::vector<float> white_bin_logits;
 
     ~server_context();
 
@@ -273,6 +274,8 @@ struct server_context {
     void init();
 
     std::vector<llama_token> tokenize(const json& json_prompt, bool add_special) const;
+
+    // std::vector<float> get_logit_bias(std::vector<std::string> scripts);
 
     server_slot* get_slot_by_id(int id);
 

@@ -134,6 +134,8 @@ struct common_sampler {
     llama_token_data_array cur_p; // current candidates
 
     std::mt19937 rng;
+
+    std::vector<float>* logit_bias;     // logit bias for all tokens (or empty)
 };
 
 

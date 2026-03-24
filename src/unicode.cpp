@@ -20,24 +20,23 @@
 #include <vector>
 
 
-bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
-    const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
-    bool found = true;
-    for (size_t i = 0; found && (i < cpts.size()); ++i) {
-        const uint32_t cpt = cpts[i];
-        found = false;
-        for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
-            auto it_us = unicode_scripts.find(uscripts[j]);
-            if (it_us != unicode_scripts.end()) {
-                const auto& heads = it_us->second.first;
-                auto it_heads = std::lower_bound(heads.begin(), heads.end(), cpt);
-                if (it_heads < heads.end()) {
-                    found = cpt <= it_us->second.second[std::distance(heads.begin(), it_heads)];
-                }
-            }
+void unicode_fill_from_utf8(std::string* utf8, std::vector<std::pair<uint32_t, std::string>>* cpts_scripts) {
+    const auto& lasts = unicode_lascripair.first;
+    const auto& scripts = unicode_lascripair.second;
+
+    auto cpts = unicode_cpts_from_utf8(*utf8);
+    for (size_t j = 0; j < cpts.size(); ++j) {
+        const auto& cpt = cpts[j];
+        const auto it = std::lower_bound(lasts.begin(), lasts.end(), cpt);
+        if (it != lasts.end()) {
+            cpts_scripts->push_back({
+                cpt,
+                scripts[std::distance(lasts.begin(), it)]
+            });
+        } else {
+            printf("%s: '%c' is out of range, cpt=%u\n", __func__, (*utf8)[j], cpt);
         }
     }
-    return found;
 }
 
 size_t unicode_len_utf8(char src) {

@@ -22,8 +22,6 @@ struct llama_sampling {
 // internal API
 //
 
-void llama_sample_apply_bias(const int n_vocab, float* logits, float* bias);
-
 void llama_set_rng_seed_impl(struct llama_sampling * smpl, uint32_t seed);
 
 void llama_sample_softmax_impl  (struct llama_sampling * smpl, llama_token_data_array * candidates, bool normalize = true);

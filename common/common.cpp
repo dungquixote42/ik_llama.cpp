@@ -1619,17 +1619,48 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.banned_n = std::stoi(argv[i]);
         return true;
     }
-    if (arg == "--unicode-scripts") {
+    if (arg == "--whitelist-rule") {
         CHECK_ARG
-        params.uscripts = string_split(argv[i], ",");
+        auto subs = string_split(argv[i], ":");
+        float bias = subs.size() == 1 ? 0 : std::stof(subs[1]);
+
+        auto ssubs = string_split(subs[0], ",");
+        std::string script = std::all_of(ssubs.back().begin(), ssubs.back().end(), [](char c) {
+            return std::isalpha(c);
+        }) ? string_lower(ssubs.back()) : "";
+        if (script == "ascii") {
+            params.white_rules.push_back({ { 0x000000, 0x00007F }, "", bias });
+            return true;
+        }
+
+        std::pair<uint32_t, uint32_t> range = { 0, -1 };
+        if ((script == "") || (ssubs.size() == 2)) {
+            auto sssubs = string_split(ssubs.front(), ".");
+            if (sssubs.front() != "") {
+                range.first = std::stoul(sssubs.front());
+            }
+            if (sssubs.back() != "") {
+                range.second = std::stoul(sssubs.back());
+            }
+        }
+
+        LLAMA_LOG_INFO("%s: adding whitelist rule: %u %u %s %f\n", __func__, range.first, range.second, script.c_str(), bias);
+        params.white_rules.push_back({ range, script, bias });
         return true;
     }
-    if (arg == "--unicode-no-common") {
-        params.un_common = true;
+    if (arg == "--whitelist-tokens") {
+        CHECK_ARG
+        params.white_alltokens.push_back(argv[i]);
         return true;
     }
-    if (arg == "--unicode-no-latin") {
-        params.un_latin = true;
+    if (arg == "--whitelist-token") {
+        CHECK_ARG
+        params.white_tokens.push_back(argv[i]);
+        return true;
+    }
+    if (arg == "--whitelist-binned-at") {
+        CHECK_ARG
+        params.white_bin_at = std::stoul(argv[i]);
         return true;
     }
     if (arg == "-ld" || arg == "--logdir") {
@@ -2370,9 +2401,13 @@ void gpt_params_print_usage(int /*argc*/, char ** argv, const gpt_params & param
     options.push_back({ "*",           "       --top-n-sigma t",        "top-n-sigma parmeter (default: %.1f, 0.0 = disabled)", (double)sparams.top_n_sigma});
     options.push_back({ "*",           "       --adaptive-target",      "adaptive-p sampling: (default: %.2f, <0.0 = disabled)", (double)sparams.adaptive_target});
     options.push_back({ "*",           "       --adaptive-decay",       "adaptive-p sampling: (default: %.2f)", (double)sparams.adaptive_decay});
+    options.push_back({ "*",           "       --adaptive-updt-w-cur",  "adaptive-p sampling: (default: %s)", sparams.adaptive_updt_w_cur ? "true" : "false"});
     options.push_back({ "*",           "       --banned-string-file",   "file path of the list of banned strings on each line" });
     options.push_back({ "*",           "       --banned-n",             "number of tokens banned in the phrase during rewind. -1 means all tokens: (default: %d)",params.banned_n });
-    options.push_back({ "*",           "       --adaptive-updt-w-cur",  "adaptive-p sampling: (default: %s)", sparams.adaptive_updt_w_cur ? "true" : "false"});
+    // options.push_back({ "*",           "       --whitelist-script",     "comma separated scripts to whitelist (default: \"%s\", \"\" = disabled)", params.uspl_script.c_str() });
+    // options.push_back({ "*",           "       --whitelist-tokens",     "tokens to delist from blacklist. concatenated without delimiters. may be specified multiple times (default count: %zu)", params.uspl_tokens.size() });
+    // options.push_back({ "*",           "       --whitelist-unsafe",     "if specified, \"ascii\" and \"common\" are not automatically added to whitelist (default: %s)", params.uspl_unsafe ? "true" : "false" });
+
     options.push_back({ "*",           "       -l TOKEN_ID(+/-)BIAS",   "modifies the likelihood of token appearing in the completion,\n"
                                                                         "i.e. `--logit-bias 15043+1` to increase likelihood of token ' Hello',\n"
                                                                         "or `--logit-bias 15043-1` to decrease likelihood of token ' Hello'" });
