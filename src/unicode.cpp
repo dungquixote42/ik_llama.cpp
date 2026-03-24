@@ -19,6 +19,27 @@
 #include <utility>
 #include <vector>
 
+
+bool unicode_utf8_in_uscripts(const std::string& utf8, const std::vector<std::string>& uscripts) {
+    const std::vector<uint32_t> cpts = unicode_cpts_from_utf8(utf8);
+    bool found = true;
+    for (size_t i = 0; found && (i < cpts.size()); ++i) {
+        const uint32_t cpt = cpts[i];
+        found = false;
+        for (size_t j = 0; !found && (j < uscripts.size()); ++j) {
+            auto it_us = unicode_scripts.find(uscripts[j]);
+            if (it_us != unicode_scripts.end()) {
+                const auto& heads = it_us->second.first;
+                auto it_heads = std::lower_bound(heads.begin(), heads.end(), cpt);
+                if (it_heads < heads.end()) {
+                    found = cpt <= it_us->second.second[std::distance(heads.begin(), it_heads)];
+                }
+            }
+        }
+    }
+    return found;
+}
+
 size_t unicode_len_utf8(char src) {
     const size_t lookup[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 3, 4 };
     uint8_t highbits = static_cast<uint8_t>(src) >> 4;

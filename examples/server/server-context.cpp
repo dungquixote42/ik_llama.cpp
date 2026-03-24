@@ -162,6 +162,32 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
+    auto& uscripts = params_base.uscripts;
+    if (uscripts.size() > 0) {
+        size_t n_found = 0;
+        if (!params_base.un_common && (find(uscripts.begin(), uscripts.end(), "common") == uscripts.end())) {
+            uscripts.push_back("common");
+        }
+        if (!params_base.un_latin && (find(uscripts.begin(), uscripts.end(), "latin") == uscripts.end())) {
+            uscripts.push_back("latin");
+        }
+        for (const auto& uscript: uscripts) {
+            LLAMA_LOG_DEBUG("%s: uscript = %s\n", __func__, uscript.data());
+        }
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
+        for (int32_t id = 0; id < n_vocab; ++id) {
+            std::string utf8 = common_detokenize(vocab, { id }, false);
+            if ((utf8.size() > 0) && !llama_utf8_in_uscripts(&utf8, &uscripts)) {
+                uscripts_bias[id] = -999.0f;
+            } else {
+                uscripts_bias[id] = 0.0f;
+                ++n_found;
+            }
+        }
+        LLAMA_LOG_DEBUG("%s: n_found = %zu, n_vocab = %d\n", __func__, n_found, n_vocab);
+    }
+
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });
 
     for (int i = 0; i < params_base.n_parallel; i++) {
@@ -254,6 +280,8 @@ void server_context::init() {
                 }
             }
         }
+
+        slot.ctx_sampling->uscripts_bias = uscripts_bias;
 
         slot.reset();
 

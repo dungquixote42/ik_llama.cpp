@@ -283,6 +283,10 @@ struct gpt_params {
     size_t n_buffer 				 =  0; // number of token buffers for string ban
     bool can_ban_phrases             = true;  // whether to ban strings
 
+    std::vector<std::string> uscripts;
+    bool un_common = false;
+    bool un_latin  = false;
+
     std::vector<llama_model_kv_override> kv_overrides;
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;
     std::vector<std::pair<int,int>> offload_policy;

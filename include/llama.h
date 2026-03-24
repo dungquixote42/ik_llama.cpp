@@ -1526,4 +1526,8 @@ llama_token llama_sample_token_with_rng(struct llama_context * ctx, llama_token_
 
 #endif // LLAMA_API_INTERNAL
 
+bool llama_utf8_in_uscripts(void* utf8, void* uscripts);
+
+void llama_apply_bias(const int n_vocab, float* logits, float* bias);
+
 #endif // LLAMA_H

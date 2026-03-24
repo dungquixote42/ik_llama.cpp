@@ -65,8 +65,11 @@ def out(line=""):
     print(line, end='\n')  # noqa
 
 
+# heads, tails = get_script_data()
+script_data = get_script_data()
+
 out("""\
-// generated with scripts/gen-unicode-scripts-data.py
+// generated with scripts/gen-unicode-scripts.py
 
 #include "unicode-data.h"
 
@@ -76,13 +79,11 @@ out("""\
 #include <vector>
 """)
 
-out("constexpr std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>> unicode_scripts = {")
+out("const std::unordered_map<std::string, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> unicode_scripts = {")
 
-script_data = get_script_data()
 for script in script_data:
     out("{ \"%s\", { {" % script)
     for data in script_data[script]:
-        # out("    { 0x%06X, 0x%06X }," % (data[0], data[1]))
         out("    0x%06X," % data[0])
     out("}, {")
     for data in script_data[script]:

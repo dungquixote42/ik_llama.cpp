@@ -1619,6 +1619,19 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         params.banned_n = std::stoi(argv[i]);
         return true;
     }
+    if (arg == "--unicode-scripts") {
+        CHECK_ARG
+        params.uscripts = string_split(argv[i], ",");
+        return true;
+    }
+    if (arg == "--unicode-no-common") {
+        params.un_common = true;
+        return true;
+    }
+    if (arg == "--unicode-no-latin") {
+        params.un_latin = true;
+        return true;
+    }
     if (arg == "-ld" || arg == "--logdir") {
         CHECK_ARG
         params.logdir = argv[i];
