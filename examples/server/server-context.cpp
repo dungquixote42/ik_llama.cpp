@@ -162,19 +162,24 @@ bool server_context::load_model(const gpt_params& params_) {
 void server_context::init() {
     const int32_t n_ctx_slot = n_ctx / params_base.n_parallel;
 
+    const llama_vocab* vocab = llama_model_get_vocab(model);
+    const int32_t n_vocab = llama_vocab_n_tokens(vocab);
+    std::vector<std::string> tokens;
+    tokens.resize(n_vocab);
+    for (int32_t id = 0; id < n_vocab; ++id) {
+        tokens[id] = common_detokenize(vocab, { id }, false);
+    }
+
     auto white_rules = params_base.white_rules;
     if (white_rules.size() > 0) {
         SRV_INF("%s\n", "initializing whitelists");
-        const llama_vocab* vocab = llama_model_get_vocab(model);
-        int32_t n_vocab = llama_vocab_n_tokens(vocab);
         white_logits.resize(n_vocab);
         white_bin_logits.resize(n_vocab);
 
         float max_logit = -INFINITY;
+        std::vector<std::pair<uint32_t, std::string>> cpts_scripts;
         for (int32_t id = 0; id < n_vocab; ++id) {
-            std::string utf8 = common_detokenize(vocab, { id }, false);
-            std::vector<std::pair<uint32_t, std::string>> cpts_scripts;
-            llama_fill_from_utf8(&utf8, &cpts_scripts);
+            llama_fill_from_utf8(&tokens[id], &cpts_scripts);
 
             float logit = -999;
             for (const auto& cpt_script: cpts_scripts) {
@@ -188,11 +193,11 @@ void server_context::init() {
                     }
                 }
             }
-
             white_logits[id] = logit;
             white_bin_logits[id] = logit < 0 ? -999 : 0;
             max_logit = std::max(max_logit, logit);
         }
+        cpts_scripts.clear();
 
         for (const auto& alltoken: params_base.white_alltokens) {
             for (const auto id: common_tokenize(model, alltoken, false, true)) {
