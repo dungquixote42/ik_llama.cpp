@@ -210,12 +210,6 @@ void server_context::init() {
                 SRV_INF("%s is not a token\n", token.data());
             }
         }
-
-        std::string testring = "\"그";
-        auto ids = common_tokenize(model, testring, false, true);
-        for (int i = 0; i < ids.size(); i++) {
-            printf("%c: %f %f\n", testring[i], white_logits[ids[i]], white_bin_logits[ids[i]]);
-        }
     }
 
     LOG_INFO("initializing slots", { {"n_slots", params_base.n_parallel} });

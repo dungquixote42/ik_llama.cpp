@@ -275,8 +275,6 @@ struct server_context {
 
     std::vector<llama_token> tokenize(const json& json_prompt, bool add_special) const;
 
-    // std::vector<float> get_logit_bias(std::vector<std::string> scripts);
-
     server_slot* get_slot_by_id(int id);
 
     float calculate_slot_f_keep(const server_slot& slot, llama_context* ctx, const server_tokens& a, const server_tokens& b);

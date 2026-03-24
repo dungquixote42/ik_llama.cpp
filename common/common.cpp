@@ -2404,10 +2404,6 @@ void gpt_params_print_usage(int /*argc*/, char ** argv, const gpt_params & param
     options.push_back({ "*",           "       --adaptive-updt-w-cur",  "adaptive-p sampling: (default: %s)", sparams.adaptive_updt_w_cur ? "true" : "false"});
     options.push_back({ "*",           "       --banned-string-file",   "file path of the list of banned strings on each line" });
     options.push_back({ "*",           "       --banned-n",             "number of tokens banned in the phrase during rewind. -1 means all tokens: (default: %d)",params.banned_n });
-    // options.push_back({ "*",           "       --whitelist-script",     "comma separated scripts to whitelist (default: \"%s\", \"\" = disabled)", params.uspl_script.c_str() });
-    // options.push_back({ "*",           "       --whitelist-tokens",     "tokens to delist from blacklist. concatenated without delimiters. may be specified multiple times (default count: %zu)", params.uspl_tokens.size() });
-    // options.push_back({ "*",           "       --whitelist-unsafe",     "if specified, \"ascii\" and \"common\" are not automatically added to whitelist (default: %s)", params.uspl_unsafe ? "true" : "false" });
-
     options.push_back({ "*",           "       -l TOKEN_ID(+/-)BIAS",   "modifies the likelihood of token appearing in the completion,\n"
                                                                         "i.e. `--logit-bias 15043+1` to increase likelihood of token ' Hello',\n"
                                                                         "or `--logit-bias 15043-1` to decrease likelihood of token ' Hello'" });
